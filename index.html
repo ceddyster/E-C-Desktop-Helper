@@ -31,8 +31,37 @@
   </header>
 
   <main class="grid">
-    <!-- DAILY OVERVIEW -->
-    <section class="card daily" aria-labelledby="dailyTitle">
+    <!-- TODAY (compact) -->
+    <section class="card win" id="todayWin" tabindex="0" role="button" aria-label="Open today's full details">
+      <div class="win-head">
+        <div>
+          <h2>Today</h2>
+          <p class="muted small" id="todayWinDate"></p>
+        </div>
+        <span class="win-open" aria-hidden="true">Details ›</span>
+      </div>
+      <ul class="win-list" id="todayWinList"></ul>
+    </section>
+
+    <!-- CALENDAR (compact: today + tomorrow) -->
+    <section class="card win" id="calWin" tabindex="0" role="button" aria-label="Open the week calendar">
+      <div class="win-head">
+        <h2>Calendar</h2>
+        <span class="win-open" aria-hidden="true">Week view ›</span>
+      </div>
+      <div class="win-days" id="calWinDays"></div>
+    </section>
+
+    <!-- PLACEHOLDERS -->
+    <section class="card placeholder"><span>Add-on slot 1</span></section>
+    <section class="card placeholder"><span>Add-on slot 2</span></section>
+    <section class="card placeholder"><span>Add-on slot 3</span></section>
+    <section class="card placeholder"><span>Add-on slot 4</span></section>
+  </main>
+
+  <!-- DAY DETAIL -->
+  <dialog id="dayDlg" class="dlg panel" aria-labelledby="dailyTitle">
+    <div class="dlg-inner">
       <div class="card-head">
         <div>
           <h2 id="dailyTitle">Today</h2>
@@ -42,6 +71,7 @@
           <button class="btn sm" id="dayPrev" aria-label="Previous day">‹</button>
           <button class="btn sm" id="dayToday">Today</button>
           <button class="btn sm" id="dayNext" aria-label="Next day">›</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
         </div>
       </div>
       <div class="daily-body">
@@ -54,38 +84,41 @@
           <ul class="shift-list" id="dailyShifts"></ul>
         </div>
       </div>
-    </section>
+    </div>
+  </dialog>
 
-    <!-- CALENDAR -->
-    <section class="card calendar" aria-labelledby="calTitle">
+  <!-- CALENDAR DETAIL -->
+  <dialog id="calDlg" class="dlg panel" aria-labelledby="calTitle">
+    <div class="dlg-inner">
       <div class="card-head">
         <h2 id="calTitle">Calendar</h2>
         <div class="seg">
+          <div class="switch" role="group" aria-label="Calendar range">
+            <button type="button" class="sw" data-calrange="week">Week</button>
+            <button type="button" class="sw" data-calrange="month">Month</button>
+          </div>
           <div class="switch" role="group" aria-label="Calendar shows">
             <button type="button" class="sw" data-calmode="shifts">Shifts</button>
             <button type="button" class="sw" data-calmode="events">Events</button>
           </div>
           <label class="toggle"><input type="checkbox" id="onlyMine"> Only mine</label>
-          <button class="btn sm" id="calPrev" aria-label="Previous month">‹</button>
+          <button class="btn sm" id="calPrev" aria-label="Previous">‹</button>
           <span class="month-label" id="calMonth"></span>
-          <button class="btn sm" id="calNext" aria-label="Next month">›</button>
+          <button class="btn sm" id="calNext" aria-label="Next">›</button>
+          <button class="btn sm" id="calThis">Today</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
         </div>
       </div>
-      <div class="cal-wrap">
+      <div class="cal-wrap" id="calWrap">
         <div class="cal-grid" id="calGrid" role="grid"></div>
-        <aside class="upcoming">
+        <aside class="upcoming" id="upcomingAside">
           <h3 class="label">Next 7 days</h3>
           <ul id="upcomingList"></ul>
         </aside>
       </div>
-    </section>
-
-    <!-- PLACEHOLDERS -->
-    <section class="card placeholder"><span>Add-on slot 1</span></section>
-    <section class="card placeholder"><span>Add-on slot 2</span></section>
-    <section class="card placeholder"><span>Add-on slot 3</span></section>
-    <section class="card placeholder"><span>Add-on slot 4</span></section>
-  </main>
+      <p class="muted small cal-hint">Click a day to see its full details.</p>
+    </div>
+  </dialog>
 
   <!-- IMPORT REVIEW -->
   <dialog id="importDlg" class="dlg wide">

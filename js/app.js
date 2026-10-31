@@ -7,13 +7,15 @@
 
   /* ---------- State ---------- */
   let state = { sources: [], events: [], shifts: [], myName: '' };
-  const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), onlyMine: false, calMode: 'shifts' };
+  const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), weekStart: null, onlyMine: false, calMode: 'shifts', calRange: 'week' };
 
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = Object.assign(state, s); } catch (_) {}
     delete state.tl;
     try { view.onlyMine = localStorage.getItem(STORE + '.onlyMine') === '1'; } catch (_) {}
     try { view.calMode = localStorage.getItem(STORE + '.calMode') || 'shifts'; } catch (_) {}
+    try { view.calRange = localStorage.getItem(STORE + '.calRange') || 'week'; } catch (_) {}
+    view.weekStart = mondayOf(new Date());
   }
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { toast('Could not save to this browser — data will reset on reload.'); }
@@ -21,6 +23,7 @@
 
   /* ---------- Helpers ---------- */
   function firstOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+  function mondayOf(d) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
   function parseISO(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
   function addDays(iso, n) { const d = parseISO(iso); d.setDate(d.getDate() + n); return P.isoOf(d); }
   const todayISO = () => P.isoOf(new Date());
@@ -115,6 +118,7 @@
     $('todayLabel').textContent = fmtLong(todayISO());
     $('sourceCount').textContent = state.sources.length;
     $('onlyMine').checked = view.onlyMine;
+    renderTodayWin(); renderCalWin();
     renderDaily(); renderCalendar(); renderUpcoming();
   }
 
@@ -136,6 +140,47 @@
         <span class="who">${esc(s.person)}${s.role ? ` <span class="muted small">${esc(s.role)}</span>` : ''}${s.duty ? `<br><span class="muted small">${esc(s.duty)}</span>` : ''}</span>
         <span class="when">${s.start ? `${fmtTime(s.start)}${s.end ? '–' + fmtTime(s.end) : ''}` : esc(s.label)}</span></li>`).join('')
       : emptyState(state.shifts.length ? 'Nobody rostered.' : 'Load a roster to see who\'s on.');
+  }
+
+  /* ---------- Compact windows (main page) ---------- */
+  const staffOf = (e) => (e.barStaff && (e.barStaff.length || e.beo || e.fromTL) ? e.barStaff.map((d) => ({ name: d.name, start: d.start }))
+    : staffFor(e).map((n) => ({ name: n, start: null })));
+
+  function renderTodayWin() {
+    const iso = todayISO();
+    $('todayWinDate').textContent = fmtLong(iso);
+    const evs = dayEvents(iso);
+    const noData = !state.events.length && !state.shifts.length;
+    $('todayWinList').innerHTML = evs.length ? evs.map((e) => {
+      const st = staffOf(e).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'));
+      return `<li><div class="win-ev"><span>${esc(e.title)}</span>${e.start ? `<span class="t">${fmtTime(e.start)}</span>` : ''}</div>
+        ${st.length ? `<div class="win-staff">${st.map((d) => `<span class="${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}</span>`).join('')}</div>`
+          : '<div class="win-none">No staff listed</div>'}</li>`;
+    }).join('') : `<li class="win-empty">${noData ? 'No documents loaded yet. <button class="btn primary sm" data-act="load">📂 Load documents</button>' : 'Nothing on today.'}</li>`;
+  }
+
+  function renderCalWin() {
+    const days = [todayISO(), addDays(todayISO(), 1)];
+    $('calWinDays').innerHTML = days.map((iso, i) => {
+      const evs = dayEvents(iso);
+      const items = evs.length ? evs.map((e) => {
+        const st = staffOf(e), from = st.map((d) => d.start).filter(Boolean).sort()[0];
+        return `<li><span class="t">${e.start ? fmtTime(e.start) : ''}</span>${esc(e.title)}
+          ${st.length ? `<span class="sub">${st.length} staff${from ? ` from ${fmtTime(from)}` : ''}</span>` : ''}</li>`;
+      }).join('') : shiftsOn(iso).map((s) => `<li><span class="t">${esc(shiftWhen(s))}</span>${esc(s.person)}${s.venue ? `<span class="sub">${esc(s.venue)}</span>` : ''}</li>`).join('');
+      return `<div class="win-day"><h3>${i ? 'Tomorrow' : 'Today'} · ${fmtShort(iso)}</h3><ul>${items || '<li class="win-empty">Nothing on.</li>'}</ul></div>`;
+    }).join('');
+  }
+
+  function openDay(iso) {
+    if (iso) selectDate(iso); else render();
+    if ($('calDlg').open) $('calDlg').close();
+    if (!$('dayDlg').open) $('dayDlg').showModal();
+  }
+  function openCal() {
+    view.weekStart = mondayOf(parseISO(view.selected));
+    render();
+    if (!$('calDlg').open) $('calDlg').showModal();
   }
 
   function eventCard(e) {
@@ -172,15 +217,28 @@
   }
 
   function renderCalendar() {
+    const week = view.calRange === 'week';
     const m = view.month;
-    $('calMonth').textContent = m.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
-    const start = new Date(m); start.setDate(1 - ((m.getDay() + 6) % 7)); // Monday-first
+    let start, cells;
+    if (week) {
+      start = new Date(view.weekStart); cells = 7;
+      const end = new Date(start); end.setDate(start.getDate() + 6);
+      const f = (d, o) => d.toLocaleDateString('en-AU', o);
+      $('calMonth').textContent = `${f(start, { day: 'numeric', month: 'short' })} – ${f(end, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    } else {
+      $('calMonth').textContent = m.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+      start = new Date(m); start.setDate(1 - ((m.getDay() + 6) % 7)); // Monday-first
+      cells = 42;
+    }
+    $('calGrid').classList.toggle('week', week);
+    $('calWrap').classList.toggle('week', week);
+    const cap = week ? 30 : 4;
     let html = DOW.map((d) => `<div class="dow">${d}</div>`).join('');
     const today = todayISO();
-    for (let i = 0; i < 42; i++) {
+    for (let i = 0; i < cells; i++) {
       const d = new Date(start); d.setDate(start.getDate() + i);
       const iso = P.isoOf(d);
-      if (i === 35 && d.getMonth() !== m.getMonth()) break; // drop empty 6th row
+      if (!week && i === 35 && d.getMonth() !== m.getMonth()) break; // drop empty 6th row
       const evs = eventsOn(iso);
       const shs = calShiftsOn(iso);
       const myShift = shiftsOn(iso).find((s) => isMe(s.person));
@@ -188,16 +246,17 @@
       const items = showShifts
         ? shs.map((s) => `<span class="sh ${isMe(s.person) ? 'mine' : ''}" title="${esc(s.person)} · ${esc(shiftWhen(s))}${s.venue ? ' · ' + esc(s.venue) : ''}"><b>${esc(shiftWhen(s))}</b> ${esc(shortName(s.person))}${s.venue ? `<br><span class="muted">${esc(s.venue)}</span>` : ''}</span>`)
         : evs.map((e) => `<span class="ev ${eventIsMine(e) ? 'mine' : ''}" title="${esc(e.title)}">${e.start ? fmtTime(e.start) + ' ' : ''}${esc(e.title)}</span>`);
-      const cls = ['day', d.getMonth() !== m.getMonth() && 'other', iso === today && 'today', iso === view.selected && 'selected'].filter(Boolean).join(' ');
+      const cls = ['day', !week && d.getMonth() !== m.getMonth() && 'other', iso === today && 'today', iso === view.selected && 'selected'].filter(Boolean).join(' ');
       html += `<button type="button" class="${cls}" data-date="${iso}" aria-label="${fmtLong(iso)}, ${shs.length} shifts, ${evs.length} events">
-        <span class="num">${d.getDate()}</span>
+        <span class="num">${d.getDate()}</span>${week ? `<span class="wk-dow">${DOW[i]}</span>` : ''}
         ${myShift && !showShifts ? `<span class="shiftdot">● On ${myShift.start ? fmtTime(myShift.start) : esc(myShift.label)}</span>` : ''}
-        ${items.slice(0, 4).join('')}
-        ${items.length > 4 ? `<span class="more">+${items.length - 4} more</span>` : ''}
+        ${items.slice(0, cap).join('')}
+        ${items.length > cap ? `<span class="more">+${items.length - cap} more</span>` : ''}
       </button>`;
     }
     $('calGrid').innerHTML = html;
     document.querySelectorAll('[data-calmode]').forEach((b) => b.classList.toggle('on', b.dataset.calmode === view.calMode));
+    document.querySelectorAll('[data-calrange]').forEach((b) => b.classList.toggle('on', b.dataset.calrange === view.calRange));
   }
 
   function renderUpcoming() {
@@ -227,6 +286,7 @@
     view.selected = iso;
     const d = parseISO(iso);
     if (d.getMonth() !== view.month.getMonth() || d.getFullYear() !== view.month.getFullYear()) view.month = firstOfMonth(d);
+    view.weekStart = mondayOf(d);
     render();
   }
 
@@ -620,8 +680,30 @@
     $('dayPrev').onclick = () => selectDate(addDays(view.selected, -1));
     $('dayNext').onclick = () => selectDate(addDays(view.selected, 1));
     $('dayToday').onclick = () => selectDate(todayISO());
-    $('calPrev').onclick = () => { view.month = new Date(view.month.getFullYear(), view.month.getMonth() - 1, 1); render(); };
-    $('calNext').onclick = () => { view.month = new Date(view.month.getFullYear(), view.month.getMonth() + 1, 1); render(); };
+    const step = (n) => {
+      if (view.calRange === 'week') { const w = new Date(view.weekStart); w.setDate(w.getDate() + 7 * n); view.weekStart = w; }
+      else view.month = new Date(view.month.getFullYear(), view.month.getMonth() + n, 1);
+      render();
+    };
+    $('calPrev').onclick = () => step(-1);
+    $('calNext').onclick = () => step(1);
+    $('calThis').onclick = () => { view.weekStart = mondayOf(new Date()); view.month = firstOfMonth(new Date()); render(); };
+    document.querySelectorAll('[data-calrange]').forEach((b) => b.onclick = () => {
+      view.calRange = b.dataset.calrange;
+      try { localStorage.setItem(STORE + '.calRange', view.calRange); } catch (_) {}
+      if (view.calRange === 'month') view.month = firstOfMonth(view.weekStart);
+      render();
+    });
+    // Compact windows open their detail panels.
+    const opener = (id, fn) => {
+      $(id).addEventListener('click', (e) => { if (!e.target.closest('button, a, select')) fn(); });
+      $(id).addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === $(id)) { e.preventDefault(); fn(); } });
+    };
+    opener('todayWin', () => openDay(todayISO()));
+    opener('calWin', openCal);
+    document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => b.closest('dialog').close());
+    // Clicking outside a panel closes it.
+    ['dayDlg', 'calDlg'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target === $(id)) $(id).close(); }));
     document.querySelectorAll('[data-calmode]').forEach((b) => b.onclick = () => {
       view.calMode = b.dataset.calmode;
       try { localStorage.setItem(STORE + '.calMode', view.calMode); } catch (_) {}
@@ -653,7 +735,8 @@
       }
     }, true);
     document.addEventListener('click', (e) => {
-      const d = e.target.closest('[data-date]'); if (d) { selectDate(d.dataset.date); if (d.closest('#upcomingList')) $('dailyTitle').scrollIntoView({ behavior: 'smooth' }); }
+      const d = e.target.closest('[data-date]');
+      if (d) { if (d.closest('#calDlg')) openDay(d.dataset.date); else selectDate(d.dataset.date); }
       if (e.target.closest('[data-act="load"]')) pickLocal();
     });
 
