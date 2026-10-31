@@ -32,6 +32,12 @@ Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
+### TL Sheet (SharePoint)
+
+The **TL Sheet** card stores the SharePoint link. Paste it in, or choose the `.url` shortcut file. After that, **Open TL Sheet ↗** opens it in one click. To get its data into the dashboard, download a copy (Excel for the web: *File → Create a Copy → Download a Copy*) or pick the workbook from a synced SharePoint folder, then click **Import copy**. Each import replaces the previous TL Sheet data, whatever the download is called. If a sheet has no Date column, the date is taken from a title row (e.g. "TL Sheet - Tuesday 3 November"), the tab name or the file name.
+
+Reading SharePoint live would need a Microsoft 365 app registration approved by IT. It's a possible later step.
+
 ### Native Google Sheets
 
 If a roster is a *native* Google Sheet, it appears on G: as a `.gsheet` shortcut, and the page can't read that. Either use **File → Download → Microsoft Excel** in Sheets and load the `.xlsx`, or set up the optional Drive button below.

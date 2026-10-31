@@ -192,3 +192,15 @@ input[type="text"], select {
 .toast.show { opacity: 1; transform: translateX(-50%); }
 .event-list li.empty { display: block; border-left: 1px dashed var(--border); background: transparent; }
 .shift-list li.empty { display: block; border-bottom: 1px dashed var(--border); }
+
+/* TL Sheet card */
+.tl { display: flex; flex-direction: column; }
+.tl .stack { display: grid; gap: 8px; }
+.tl .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.tl .row input { flex: 1 1 140px; }
+.tl .host { font-size: .82rem; color: var(--muted); word-break: break-all; }
+.tl details { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+.tl details summary { cursor: pointer; }
+.tl details ol { padding-left: 18px; margin: 6px 0 0; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; font-size: .82rem; }
+a.btn { text-decoration: none; text-align: center; display: inline-block; }

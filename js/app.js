@@ -6,11 +6,12 @@
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   /* ---------- State ---------- */
-  let state = { sources: [], events: [], shifts: [], myName: '' };
+  let state = { sources: [], events: [], shifts: [], myName: '', tl: { url: '', lastImport: null } };
   const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), onlyMine: false };
 
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = Object.assign(state, s); } catch (_) {}
+    state.tl = Object.assign({ url: '', lastImport: null }, state.tl, { editing: false });
     try { view.onlyMine = localStorage.getItem(STORE + '.onlyMine') === '1'; } catch (_) {}
   }
   function save() {
@@ -71,7 +72,7 @@
     $('todayLabel').textContent = fmtLong(todayISO());
     $('sourceCount').textContent = state.sources.length;
     $('onlyMine').checked = view.onlyMine;
-    renderDaily(); renderCalendar(); renderUpcoming();
+    renderDaily(); renderCalendar(); renderUpcoming(); renderTL();
   }
 
   function emptyState(msg, withButton) {
@@ -151,13 +152,16 @@
   /* ---------- Import flow ---------- */
   let pending = []; // [{fileName, sheets:[analysed]}]
 
-  async function handleFiles(files) {
+  async function handleFiles(files, opts) {
+    opts = opts || {};
     pending = [];
     const errors = [];
     for (const f of files) {
       try {
         const sheets = await P.readFile(f.name, f.buf);
-        pending.push({ fileName: f.name, sheets });
+        if (sheets[0] && sheets[0].kind === 'link') { setTLLink(sheets[0].url); continue; }
+        // TL Sheet copies always replace the previous copy, whatever the download was called.
+        pending.push(opts.tl ? { fileName: f.name, sheets, sourceId: 'src:tl-sheet', displayName: `TL Sheet (${f.name})` } : { fileName: f.name, sheets });
       } catch (e) { errors.push(`${f.name}: ${e.message}`); }
     }
     if (errors.length) toast(errors.join(' · '));
@@ -229,7 +233,7 @@
   function commitImport() {
     let ne = 0, ns = 0;
     for (const file of pending) {
-      const id = 'src:' + file.fileName.toLowerCase();
+      const id = file.sourceId || 'src:' + file.fileName.toLowerCase();
       removeSource(id, true);
       const events = [], shifts = [];
       for (const sh of file.sheets) {
@@ -240,7 +244,8 @@
       events.forEach((e, i) => { e.id = `${id}#e${i}`; e.source = id; });
       shifts.forEach((s, i) => { s.id = `${id}#s${i}`; s.source = id; });
       state.events.push(...events); state.shifts.push(...shifts);
-      state.sources.push({ id, name: file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length });
+      if (id === 'src:tl-sheet') state.tl.lastImport = new Date().toISOString();
+      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length });
       ne += events.length; ns += shifts.length;
     }
     pending = [];
@@ -260,6 +265,62 @@
       <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts · loaded ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
       : '<li class="empty">No documents loaded.</li>';
+  }
+
+  /* ---------- TL Sheet ---------- */
+  function setTLLink(raw) {
+    let u;
+    try { u = new URL(String(raw).trim()); } catch (_) { toast('That doesn\'t look like a web link.'); return false; }
+    if (u.protocol !== 'https:') { toast('The link should start with https://'); return false; }
+    state.tl.url = u.href; state.tl.editing = false; save(); renderTL();
+    toast('TL Sheet link saved.');
+    return true;
+  }
+
+  function renderTL() {
+    const tl = state.tl, body = $('tlBody');
+    if (!body) return;
+    const src = state.sources.find((s) => s.id === 'src:tl-sheet');
+    $('tlStatus').textContent = src
+      ? `Last imported ${new Date(src.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })} · ${src.events} events`
+      : tl.url ? 'Linked. Not imported yet.' : 'Not linked yet.';
+    const help = `<details><summary>How do I get a copy to import?</summary><ol>
+        <li>Open the TL Sheet.</li>
+        <li>In Excel for the web: <b>File → Create a Copy → Download a Copy</b>.</li>
+        <li>Click <b>Import copy</b> here and pick the downloaded .xlsx.</li></ol>
+        <p>Or, if the SharePoint folder is synced to File Explorer, pick the workbook straight from there.</p></details>`;
+    if (!tl.url || tl.editing) {
+      body.innerHTML = `<div class="stack">
+        <label class="field">Paste the SharePoint link
+          <div class="row"><input type="text" id="tlUrl" placeholder="https://….sharepoint.com/…" value="${esc(tl.url)}"><button class="btn primary sm" type="button" id="tlSave">Save</button></div>
+        </label>
+        <p class="muted small">…or <button class="linkbtn" type="button" id="tlPickShortcut">choose the TL Sheet shortcut file</button>.</p>
+        ${tl.url ? '<button class="linkbtn" type="button" id="tlCancel">Cancel</button>' : ''}
+      </div>`;
+    } else {
+      let host = ''; try { host = new URL(tl.url).hostname; } catch (_) {}
+      body.innerHTML = `<div class="stack">
+        <a class="btn primary" href="${esc(tl.url)}" target="_blank" rel="noopener noreferrer">Open TL Sheet ↗</a>
+        <button class="btn" type="button" id="tlImport">Import copy</button>
+        <div class="host">${esc(host)} · <button class="linkbtn" type="button" id="tlEdit">change link</button></div>
+        ${help}
+      </div>`;
+    }
+  }
+
+  function wireTL() {
+    $('tlBody').addEventListener('click', (e) => {
+      const id = e.target.id;
+      if (id === 'tlSave') { setTLLink($('tlUrl').value); }
+      else if (id === 'tlCancel') { state.tl.editing = false; renderTL(); }
+      else if (id === 'tlEdit') { state.tl.editing = true; renderTL(); }
+      else if (id === 'tlPickShortcut' || id === 'tlImport') { $('tlFileInput').value = ''; $('tlFileInput').click(); }
+    });
+    $('tlBody').addEventListener('keydown', (e) => { if (e.target.id === 'tlUrl' && e.key === 'Enter') { e.preventDefault(); $('tlSave').click(); } });
+    $('tlFileInput').onchange = async (e) => {
+      const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, buf: await f.arrayBuffer() })));
+      if (files.length) handleFiles(files, { tl: true });
+    };
   }
 
   /* ---------- Sample data ---------- */
@@ -346,5 +407,5 @@
     setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; render(); } }, 60000);
   }
 
-  load(); wire(); render();
+  load(); wire(); wireTL(); render();
 })();

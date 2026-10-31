@@ -121,7 +121,7 @@
 
   const FIELDS = [
     ['date',   /\b(date|day)\b/],
-    ['staff',  /\b(staff|manager|mgr|supervisor|assigned|working|lead|coordinator|captain|host|on duty|duty|ops|team)\b/],
+    ['staff',  /\b(staff|manager|mgr|supervisor|assigned|working|lead|tl|team leader|coordinator|captain|host|on duty|duty|ops|team)\b/],
     ['start',  /\b(start|from|begin|commence|time in|arrival|arrive|doors)\b/],
     ['end',    /\b(end|finish|until|time out|close|conclude|depart)\b/],
     ['venue',  /\b(venue|room|location|space|area|outlet|level|floor|ballroom)\b/],
@@ -178,7 +178,7 @@
 
   /* ---------- Sheet analysis ---------- */
 
-  function analyseRows(rows, label) {
+  function analyseRows(rows, label, fileName) {
     rows = rows.filter((r) => r && r.some((c) => c !== '' && c != null));
     const headerIdx = findHeaderRow(rows);
     const headers = (rows[headerIdx] || []).map((h) => (h instanceof Date ? isoOf(h) : String(h == null ? '' : h).trim()));
@@ -193,7 +193,12 @@
     if (kind === 'grid' && mapping.person == null) {
       mapping.person = mapping.staff != null ? mapping.staff : headers.findIndex((_, i) => !dateCols.includes(i));
     }
-    return { label, rows, headerIdx, headers, mapping, kind, dateCols };
+    // Day sheets often have no Date column: the date sits in a title row, the tab name or the file name.
+    let contextDate = null;
+    for (let i = 0; i < headerIdx && !contextDate; i++) for (const c of rows[i]) { if ((contextDate = toISODate(c))) break; }
+    contextDate = contextDate || toISODate(label) || toISODate(String(fileName || '').replace(/\.[a-z0-9]+$/i, ''));
+    if (kind === 'skip' && contextDate && (mapping.title != null || mapping.venue != null)) kind = 'events';
+    return { label, rows, headerIdx, headers, mapping, kind, dateCols, contextDate };
   }
 
   const cell = (row, i) => (i == null || i < 0 ? '' : row[i]);
@@ -213,7 +218,7 @@
         if (date) lastDate = date;
         const title = text(cell(row, m.title));
         if (!title) continue;
-        const d = date || lastDate;            // dates are often only on the first row of a block
+        const d = date || lastDate || sheet.contextDate;  // dates are often only on the first row of a block
         if (!d) continue;
         let start = toTime(cell(row, m.start)), end = toTime(cell(row, m.end));
         if (!start) { const r = parseRange(cell(row, m.start)); if (r) { start = r.start; end = end || r.end; } }
@@ -231,7 +236,7 @@
       for (const row of body) {
         const date = toISODate(cell(row, m.date)); if (date) lastDate = date;
         const person = text(cell(row, who));
-        if (!person || !(date || lastDate)) continue;
+        if (!person || !(date || lastDate || sheet.contextDate)) continue;
         let start = toTime(cell(row, m.start)), end = toTime(cell(row, m.end)), label = '';
         if (!start) {
           const raw = text(cell(row, m.start));
@@ -240,7 +245,7 @@
           else if (raw && OFF_CODES.test(raw)) continue;
           else label = raw;
         }
-        out.shifts.push({ date: date || lastDate, person, start, end, label, role: text(cell(row, m.role)), venue: text(cell(row, m.venue)) });
+        out.shifts.push({ date: date || lastDate || sheet.contextDate, person, start, end, label, role: text(cell(row, m.role)), venue: text(cell(row, m.venue)) });
       }
     } else if (kind === 'grid') {
       const header = rows[headerIdx];
@@ -275,7 +280,7 @@
     const wb = global.XLSX.read(buf, isText ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
     return wb.SheetNames.map((sn) => {
       const rows = global.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '', blankrows: false });
-      return analyseRows(rows, wb.SheetNames.length > 1 ? sn : '');
+      return analyseRows(rows, wb.SheetNames.length > 1 ? sn : '', name);
     });
   }
 
@@ -318,6 +323,12 @@
   /** Reads one file → [{label, kind, ...sheet}] or a ready result for ics/json. */
   async function readFile(name, buf) {
     const ext = (name.split('.').pop() || '').toLowerCase();
+    if (ext === 'url' || ext === 'website') {
+      // Windows internet shortcut: [InternetShortcut] URL=https://...
+      const m = new TextDecoder().decode(buf).match(/^URL=(https:\/\/\S+)/mi);
+      if (!m) throw new Error('No web address found in this shortcut.');
+      return [{ label: '', kind: 'link', url: m[1].trim() }];
+    }
     if (ext === 'ics') {
       const events = parseIcs(new TextDecoder().decode(buf));
       return [{ label: '', kind: 'ready', ready: { events, shifts: [], warnings: events.length ? [] : ['No events found in this calendar file.'] } }];
