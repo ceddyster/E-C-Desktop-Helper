@@ -1,4 +1,4 @@
-/* Linked folder: the dashboard remembers a folder on this computer (e.g. a SharePoint library
+/* Linked folders: the dashboard remembers folders on this computer (e.g. a SharePoint library
  * synced to File Explorer) and picks up new or changed TL Sheets and BEOs from it.
  * Uses the File System Access API (Edge / Chrome). The folder handle is kept in IndexedDB;
  * nothing leaves the computer. */
@@ -82,5 +82,37 @@
     } catch (_) { return ''; }
   }
 
-  global.CrownFolder = { shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list };
+  /* Several linked folders, kept as [{ id, handle }]. The original single folder (key 'folder')
+   * is moved into the list the first time. */
+  const LIST = 'folders';
+  async function savedAll() {
+    let items = null;
+    try { items = await tx('readonly', (st) => st.get(LIST)); } catch (_) { return []; }
+    if (!items || !items.length) {
+      const old = await saved();
+      items = old ? [{ id: 'f1', handle: old }] : (items || []);
+      try { await tx('readwrite', (st) => st.put(items, LIST)); if (old) await forget(); } catch (_) {}
+    }
+    return items;
+  }
+  const storeAll = (items) => tx('readwrite', (st) => st.put(items, LIST));
+
+  /** Asks for a folder. Doesn't store it. */
+  const choose = () => global.showDirectoryPicker({ id: 'crown-docs', mode: 'read' });
+
+  /** Adds a folder (or replaces `replaceId`). Returns { id, existed }. */
+  async function add(handle, replaceId) {
+    const items = await savedAll();
+    for (const it of items) {
+      try { if (it.id !== replaceId && await it.handle.isSameEntry(handle)) return { id: it.id, existed: true }; } catch (_) {}
+    }
+    const id = replaceId || 'f' + Date.now().toString(36);
+    const next = replaceId ? items.map((it) => (it.id === replaceId ? { id, handle } : it)) : [...items, { id, handle }];
+    await storeAll(next);
+    return { id, existed: false };
+  }
+  async function remove(id) { await storeAll((await savedAll()).filter((it) => it.id !== id)); }
+
+  global.CrownFolder = { shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
+    savedAll, choose, add, remove };
 })(window);

@@ -309,3 +309,5 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
   .day-head { display: none; }
   .day-row { grid-template-columns: 1fr; gap: 8px; }
 }
+.folder-box + .folder-box { margin-top: 10px; }
+.add-box { border-style: dashed; }

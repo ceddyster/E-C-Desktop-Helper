@@ -147,7 +147,17 @@
     if (!booking) throw new Error('This PDF doesn\'t look like a BEO (no "Booking Name").');
     const beoNoItem = p1.find((i) => /^BEO#?:?\s*\d+/i.test(i.str));
     const beoNumber = beoNoItem ? beoNoItem.str.match(/\d+/)[0] : '';
+    // "Created: 30-Oct-26 15:46": when this copy was printed from the booking system. Used to tell
+    // which of two copies of the same BEO is the latest.
+    let created = '';
+    const cm = p1.map((i) => i.str).join(' ').match(/Created:?\s*(\d{1,2})-([A-Za-z]{3})-(\d{2,4})\s+(\d{1,2}):(\d{2})/);
+    if (cm) {
+      const mon = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(cm[2].toLowerCase());
+      let y = +cm[3]; if (y < 100) y += 2000;
+      if (mon >= 0) created = `${y}-${String(mon + 1).padStart(2, '0')}-${cm[1].padStart(2, '0')}T${cm[4].padStart(2, '0')}:${cm[5]}`;
+    }
     const info = {
+      created,
       number: beoNumber,
       type: (p1.find((i) => i.y > pages[0].height - 40 && i.x < 150) || {}).str || '',
       beoName: headerValue(p1, 'BEO Name:'),
@@ -192,7 +202,7 @@
     }
     const warnings = [];
     if (!rows.length) warnings.push('Couldn\'t read the function table — only the date and name were picked up.');
-    return [{ label: `BEO ${beoNumber} · ${booking}${info.beoName ? ' · ' + info.beoName : ''}`, kind: 'ready', isBEO: true, beoNumber,
+    return [{ label: `BEO ${beoNumber} · ${booking}${info.beoName ? ' · ' + info.beoName : ''}`, kind: 'ready', isBEO: true, beoNumber, beoCreated: created,
       ready: { events, shifts: [], warnings } }];
   }
 

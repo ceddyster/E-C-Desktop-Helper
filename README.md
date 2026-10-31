@@ -35,9 +35,9 @@ Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
-### Linked folder (automatic)
+### Linked folders (automatic)
 
-Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are saved. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
+Click **📁 Link folder** and choose a folder where TL Sheets or BEOs are saved. You can link several, e.g. the synced SharePoint TL folder and a folder you save BEOs into: **Documents → Link another folder**. Each folder has its own Re-read, Change folder and Unlink buttons. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
 
 - loads every TL workbook and BEO PDF in the folder, skipping files untouched for more than 60 days on the first check
 - checks every minute while it's open, and whenever you switch back to its tab. Any file whose saved time has changed is re-read, so edits to a TL workbook replace that week's shifts. A message names the files that were updated, and **Documents** shows each file's last-saved time.
@@ -49,6 +49,8 @@ Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are sa
 **Shortcuts (.url) don't work.** A folder of `.url` shortcuts only holds web addresses, and the browser can't open SharePoint files from them. The dashboard lists any shortcuts it finds under **Documents** and links to the SharePoint site they point to. Sync that site's library and link the synced folder instead.
 
 This needs Microsoft Edge or Google Chrome. The browser may ask for permission again after it restarts: click **📁 Reconnect** in the header, or choose "Allow on every visit" when it asks.
+
+**Which copy of a BEO is used:** if there are several copies of the same BEO (same BEO#), the one with the latest **"Created:"** time in its header is kept, wherever and whenever the files turn up. An older printout downloaded later is listed under *Older BEO copies (ignored)* and doesn't replace the newer one. Deleting the PDF afterwards doesn't remove it from the dashboard.
 
 ### TL Sheet → bar team roster
 

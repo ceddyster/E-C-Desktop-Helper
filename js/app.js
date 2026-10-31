@@ -355,7 +355,8 @@
     }
     if (first.isBEO && first.beoNumber) {
       // A revised BEO ("… (6).pdf") replaces the earlier version with the same BEO number.
-      return { fileName: name, sheets, sourceId: 'src:beo:' + first.beoNumber, displayName: first.label, auto: true };
+      return { fileName: name, sheets, sourceId: 'src:beo:' + first.beoNumber, displayName: first.label, auto: true,
+        beoNumber: first.beoNumber, beoCreated: first.beoCreated || '' };
     }
     return { fileName: name, sheets, auto: /\.ics$/i.test(name) };
   }
@@ -434,6 +435,8 @@
 
   function commitImport() {
     const dates = commitEntries(pending);
+    const older = pending.filter((p) => p.olderThan);
+    if (older.length) setTimeout(() => toast(older.map((p) => `Kept the newer BEO #${p.beoNumber} (created ${fmtCreated(p.olderThan)}); “${p.fileName}” is an older copy (created ${fmtCreated(p.beoCreated)}).`).join(' ')), 50);
     const jump = dates.find((d) => d >= todayISO()) || dates[0];
     pending = [];
     save();
@@ -446,6 +449,10 @@
     const dates = [];
     for (const file of entries) {
       const id = file.sourceId || 'src:' + file.fileName.toLowerCase();
+      // Two copies of the same BEO: keep the one printed most recently (its "Created" time), whatever
+      // order the files arrive in or what they're called.
+      const prev = state.sources.find((x) => x.id === id);
+      if (file.beoCreated && prev && prev.beoCreated && file.beoCreated < prev.beoCreated) { file.olderThan = prev.beoCreated; continue; }
       removeSource(id, true);
       const events = [], shifts = [];
       for (const sh of file.sheets) {
@@ -456,7 +463,7 @@
       events.forEach((e, i) => { e.id = `${id}#e${i}`; e.source = id; });
       shifts.forEach((s, i) => { s.id = `${id}#s${i}`; s.source = id; });
       state.events.push(...events); state.shifts.push(...shifts);
-      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null });
+      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null, beoCreated: file.beoCreated || null });
       ne += events.length; ns += shifts.length;
       events.concat(shifts).forEach((x) => x.date && dates.push(x.date));
     }
@@ -464,157 +471,191 @@
     return dates.sort();
   }
 
-  /* ---------- Linked folder ---------- */
+  /* ---------- Linked folders ---------- */
+  // Several folders can be linked (e.g. the synced SharePoint TL folder and a BEO folder). Each is
+  // checked every minute while the dashboard is open; only new or changed files are read.
   const F = window.CrownFolder;
-  const folderName = () => (folderHandle && folderHandle.name) || 'linked folder';
-  let folderHandle = null, folderPerm = '', scanning = false;
-  const FIRST_SCAN_DAYS = 60;   // on first link, ignore files untouched for longer than this
+  const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
+  // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
+  const READER_VERSION = 7;
+  const pause = () => new Promise((r) => setTimeout(r, 0));
+  let folders = [];             // [{ id, handle, perm }]
+  let scanningId = null, scanProgress = '';
+  const fname = (f) => (f && f.handle && f.handle.name) || 'linked folder';
+  const fstate = (id) => { state.folders = state.folders || {}; return state.folders[id] || (state.folders[id] = { seen: {}, files: {} }); };
+  const needsOk = () => folders.filter((f) => f.perm !== 'granted');
 
   async function initFolder() {
     if (!F || !F.supported) return;
     $('btnFolder').hidden = false;
-    folderHandle = await F.saved();
-    if (folderHandle) {
-      try { folderPerm = await F.permission(folderHandle, false); } catch (_) { folderPerm = 'prompt'; }
-      if (folderPerm === 'granted') scanFolder(false);
+    const items = await F.savedAll();
+    // Older versions kept one folder's progress in state.folder.
+    if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
+    delete state.folder;
+    folders = [];
+    for (const it of items) {
+      let perm = 'prompt';
+      try { perm = await F.permission(it.handle, false); } catch (_) {}
+      folders.push({ id: it.id, handle: it.handle, perm });
+    }
+    save(); renderFolder();
+    scanAll(false);
+  }
+
+  async function linkFolder(replaceId) {
+    if (!F || !F.supported) { toast('Linking a folder needs Microsoft Edge or Google Chrome.'); return; }
+    let handle;
+    try { handle = await F.choose(); } catch (e) { if (e.name !== 'AbortError') toast('Couldn\'t link that folder: ' + e.message); return; }
+    const { id, existed } = await F.add(handle, replaceId);
+    if (existed) { toast(`📁 ${handle.name} is already linked.`); return; }
+    folders = folders.filter((f) => f.id !== id).concat({ id, handle, perm: 'granted' });
+    state.folders = state.folders || {};
+    state.folders[id] = { name: handle.name, seen: {}, files: {}, readerVersion: READER_VERSION };
+    save(); renderFolder();
+    await scanAll(true, id);
+  }
+
+  async function reconnectFolders() {
+    for (const f of needsOk()) {
+      try { f.perm = await F.permission(f.handle, true); } catch (_) { f.perm = 'denied'; }
     }
     renderFolder();
+    if (needsOk().length) toast('The browser didn\'t allow access to every folder.');
+    scanAll(true);
   }
 
-  async function linkFolder() {
-    if (!F || !F.supported) { toast('Linking a folder needs Microsoft Edge or Google Chrome.'); return; }
-    try { folderHandle = await F.pick(); } catch (e) { if (e.name !== 'AbortError') toast('Couldn\'t link that folder: ' + e.message); return; }
-    folderPerm = 'granted';
-    state.folder = { name: folderName(), seen: {}, lastScan: null, files: {}, readerVersion: READER_VERSION };
-    save();
-    if ($('sourcesDlg').open) renderSources();
-    await scanFolder(true);
+  async function unlinkFolder(id) {
+    await F.remove(id);
+    folders = folders.filter((f) => f.id !== id);
+    if (state.folders) delete state.folders[id];
+    save(); renderFolder(); renderSources();
   }
 
-  async function reconnectFolder() {
-    try { folderPerm = await F.permission(folderHandle, true); } catch (_) { folderPerm = 'denied'; }
-    renderFolder();
-    if (folderPerm === 'granted') scanFolder(true);
-    else toast('The browser didn\'t allow access to the folder.');
+  async function rereadFolder(id) {
+    fstate(id).seen = {};
+    await scanAll(true, id);
   }
 
-  async function unlinkFolder() {
-    await F.forget();
-    folderHandle = null; folderPerm = ''; delete state.folder; save(); renderFolder(); renderSources();
+  /** Checks every linked folder (or just `onlyId`), then shows one combined message. */
+  async function scanAll(verbose, onlyId) {
+    if (scanningId) return;
+    const sum = { updated: [], added: [], older: [], shortcuts: 0, found: 0, failed: [] };
+    for (const f of folders) {
+      if (f.perm !== 'granted' || (onlyId && f.id !== onlyId)) continue;
+      await scanFolder(f, sum);
+    }
+    const list = (a) => (a.length > 2 ? `${a.slice(0, 2).join(', ')} +${a.length - 2} more` : a.join(', '));
+    const parts = [sum.updated.length && `Updated: ${list(sum.updated)}`, sum.added.length && `New: ${list(sum.added)}`,
+      sum.older.length && `${sum.older.length} older BEO cop${sum.older.length === 1 ? 'y' : 'ies'} ignored`].filter(Boolean);
+    if (sum.failed.length) toast(`📁 ${sum.failed.join(' · ')}`);
+    else if (sum.updated.length || sum.added.length) toast(`📁 ${parts.join(' · ')}`);
+    else if (sum.shortcuts && verbose) toast(`📁 A linked folder holds ${sum.shortcuts} shortcut${sum.shortcuts === 1 ? '' : 's'} (.url), not the files. Open Documents to see how to fix it.`);
+    else if (verbose) toast(needsOk().length ? '📁 Some folders need reconnecting — click 📁 in the header.' : `📁 Checked. No files have changed since the last check.${sum.older.length ? ' (' + parts.join(' · ') + ')' : ''}`);
   }
 
-  /** Imports TL Sheets / BEOs that are new or changed since the last check. */
-  // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 6;
-  const pause = () => new Promise((r) => setTimeout(r, 0));
-  let scanProgress = '';
-
-  async function scanFolder(verbose) {
-    if (scanning || !folderHandle || folderPerm !== 'granted') return;
-    scanning = true; scanProgress = ''; renderFolder();
-    const st = state.folder || (state.folder = { name: folderName(), seen: {} });
+  /** Imports TL Sheets / BEOs in one folder that are new or changed since its last check. */
+  async function scanFolder(f, sum) {
+    scanningId = f.id; scanProgress = ''; renderFolder();
+    const st = fstate(f.id);
     if (st.readerVersion !== READER_VERSION) { st.seen = {}; st.readerVersion = READER_VERSION; }
     st.files = st.files || {};
-    let loadedNow = 0;
     try {
-      const files = await F.list(folderHandle);
-      const present = new Set(files.map((f) => f.path));
+      const files = await F.list(f.handle);
+      const present = new Set(files.map((x) => x.path));
       for (const k of Object.keys(st.files)) if (!present.has(k)) delete st.files[k];
       const cutoff = Date.now() - FIRST_SCAN_DAYS * 864e5;
       const todo = [];
-      for (const f of files) {
-        if (f.target !== undefined) {
-          st.files[f.path] = { status: 'shortcut', detail: f.target, site: F.sharePointSite(f.target) };
-          continue;
-        }
-        if (f.error) { st.files[f.path] = { status: 'error', detail: `couldn't open (${f.error}). If it shows a cloud icon in File Explorer, right-click → Always keep on this device.` }; continue; }
-        if (st.seen[f.path] === f.lastModified) continue;
+      for (const x of files) {
+        if (x.target !== undefined) { st.files[x.path] = { status: 'shortcut', detail: x.target, site: F.sharePointSite(x.target) }; continue; }
+        if (x.error) { st.files[x.path] = { status: 'error', detail: `couldn't open (${x.error}). If it shows a cloud icon in File Explorer, right-click → Always keep on this device.` }; continue; }
+        if (st.seen[x.path] === x.lastModified) continue;
         // Spreadsheets (TL Sheets) are always read. PDFs untouched for 60+ days are left out to keep things quick.
-        if (/\.(pdf|ics)$/i.test(f.name) && st.seen[f.path] == null && f.lastModified < cutoff) {
-          st.files[f.path] = { status: 'old', detail: `not changed in ${FIRST_SCAN_DAYS}+ days` };
+        if (/\.(pdf|ics)$/i.test(x.name) && st.seen[x.path] == null && x.lastModified < cutoff) {
+          st.files[x.path] = { status: 'old', detail: `not changed in ${FIRST_SCAN_DAYS}+ days` };
           continue;
         }
-        todo.push(f);
+        todo.push(x);
       }
-      todo.sort((a, b) => a.lastModified - b.lastModified);   // oldest first, so the newest version wins
-      const newNames = [], updatedNames = [];
+      todo.sort((a, b) => a.lastModified - b.lastModified);
       let batch = [];
-      const flush = () => { if (batch.length) { commitEntries(batch, true); loadedNow += batch.length; batch = []; save(); render(); } };
+      const flush = () => {
+        if (!batch.length) return;
+        commitEntries(batch, true);
+        for (const e of batch) {
+          const nice = e.fileName.replace(/\.[a-z0-9]+$/i, '');
+          if (e.olderThan) {
+            st.files[e.path] = { status: 'older', saved: e.fileSaved, detail: `older copy of BEO #${e.beoNumber} (created ${fmtCreated(e.beoCreated)}); the newer one (created ${fmtCreated(e.olderThan)}) is kept` };
+            sum.older.push(nice);
+          } else {
+            (e.wasSeen ? sum.updated : sum.added).push(nice);
+          }
+        }
+        batch = []; save(); render();
+      };
       for (let n = 0; n < todo.length; n++) {
-        const f = todo[n];
+        const x = todo[n];
         scanProgress = `${n + 1}/${todo.length}`; renderFolder();
         await pause();
         try {
-          const entry = await prepare(f.name, await f.file.arrayBuffer());
+          const entry = await prepare(x.name, await x.file.arrayBuffer());
           if (entry.auto) {
-            entry.fromFolder = true; entry.fileSaved = f.lastModified; entry.path = f.path; batch.push(entry);
-            (st.seen[f.path] != null ? updatedNames : newNames).push(f.name.replace(/\.[a-z0-9]+$/i, ''));
+            Object.assign(entry, { fromFolder: true, fileSaved: x.lastModified, path: x.path, wasSeen: st.seen[x.path] != null });
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
-            st.files[f.path] = { status: 'loaded', saved: f.lastModified, detail: entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}` };
+            st.files[x.path] = { status: 'loaded', saved: x.lastModified,
+              detail: entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
+            batch.push(entry);
           } else {
-            st.files[f.path] = { status: 'skipped', detail: 'not a TL Sheet (no bar tabs) or BEO' };
+            st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet (no bar tabs) or BEO' };
           }
-          st.seen[f.path] = f.lastModified;
+          st.seen[x.path] = x.lastModified;
         } catch (e) {
           // Not marked as seen, so it's tried again next time (e.g. a file still syncing).
-          st.files[f.path] = { status: 'error', detail: e.message };
+          st.files[x.path] = { status: 'error', detail: e.message };
         }
         if (batch.length >= 8) flush();
       }
       flush();
       st.lastScan = new Date().toISOString();
       st.found = files.length;
-      st.name = folderName();
-      save(); render();
-      const shortcuts = Object.values(st.files).filter((v) => v.status === 'shortcut').length;
-      if (!loadedNow && shortcuts) toast(`📁 This folder holds ${shortcuts} shortcut${shortcuts === 1 ? '' : 's'} (.url), not the files. Open Documents to see how to fix it.`);
-      else if (loadedNow) {
-        const list = (a) => (a.length > 2 ? `${a.slice(0, 2).join(', ')} +${a.length - 2} more` : a.join(', '));
-        toast(`📁 ${[updatedNames.length && `Updated: ${list(updatedNames)}`, newNames.length && `New: ${list(newNames)}`].filter(Boolean).join(' · ')}`);
-      }
-      else if (verbose) toast(files.length ? `📁 ${folderName()} checked. No files have changed since the last check.` : `📁 No spreadsheets or PDFs found in ${folderName()}.`);
+      st.name = fname(f);
+      sum.found += files.length;
+      sum.shortcuts += Object.values(st.files).filter((v) => v.status === 'shortcut').length;
     } catch (e) {
-      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') folderPerm = 'prompt';
-      else if (e.name === 'NotFoundError') toast('📁 The linked folder can\'t be found. Was it moved or renamed? Link it again.');
-      else toast('📁 Folder check failed: ' + e.message);
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') f.perm = 'prompt';
+      else if (e.name === 'NotFoundError') sum.failed.push(`${fname(f)} can't be found. Was it moved or renamed? Use Change folder.`);
+      else sum.failed.push(`${fname(f)}: ${e.message}`);
     } finally {
-      scanning = false; scanProgress = ''; save(); renderFolder();
+      scanningId = null; scanProgress = ''; save(); renderFolder();
     }
   }
 
-  async function rereadFolder() {
-    if (state.folder) state.folder.seen = {};
-    await scanFolder(true);
-  }
+  const fmtCreated = (iso) => (iso ? new Date(iso).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '?');
 
   function renderFolder() {
     const btn = $('btnFolder');
     if (!btn || btn.hidden) return;
-    const st = state.folder;
-    btn.classList.toggle('warn', !!folderHandle && folderPerm !== 'granted');
-    if (!folderHandle) { btn.textContent = '📁 Link folder'; btn.title = 'Link a folder (e.g. your synced SharePoint library) and new TL Sheets and BEOs load automatically'; }
-    else if (folderPerm !== 'granted') { btn.textContent = `📁 Reconnect ${folderName()}`; btn.title = 'The browser needs your OK again to read this folder'; }
+    const busy = folders.find((f) => f.id === scanningId);
+    btn.classList.toggle('warn', needsOk().length > 0);
+    if (!folders.length) { btn.textContent = '📁 Link folder'; btn.title = 'Link a folder (e.g. your synced SharePoint TL folder, or a BEO folder) and new files load automatically'; }
+    else if (needsOk().length) { btn.textContent = `📁 Reconnect ${needsOk().length === 1 ? fname(needsOk()[0]) : needsOk().length + ' folders'}`; btn.title = 'The browser needs your OK again to read these folders'; }
+    else if (busy) btn.textContent = `📁 Checking ${fname(busy)}${scanProgress ? ' ' + scanProgress : '…'}`;
     else {
-      btn.textContent = scanning ? `📁 Checking${scanProgress ? ' ' + scanProgress : '…'}` : `📁 ${folderName()}`;
-      btn.title = `Linked folder. ${st && st.lastScan ? 'Last checked ' + new Date(st.lastScan).toLocaleTimeString('en-AU', { timeStyle: 'short' }) + '. ' : ''}Click to check for new documents now.`;
+      btn.textContent = folders.length === 1 ? `📁 ${fname(folders[0])}` : `📁 ${folders.length} folders`;
+      btn.title = `Linked: ${folders.map(fname).join(', ')}. Click to check for new documents now.`;
     }
     const panel = $('folderPanel');
     if (!panel) return;
     if (!F || !F.supported) { panel.innerHTML = '<p class="muted small">Linking a folder needs Microsoft Edge or Google Chrome.</p>'; return; }
-    if (!folderHandle) {
-      panel.innerHTML = `<div class="folder-box"><strong>No folder linked</strong>
-        <p class="muted small">Link the folder where TL Sheets and BEOs are saved, such as a SharePoint library synced to File Explorer. New or updated files load automatically.</p>
-        <div class="row"><button class="btn primary sm" type="button" data-folder="link">📁 Link folder</button></div></div>`;
-      return;
-    }
-    const files = Object.entries((st && st.files) || {}).sort((a, b) => a[0].localeCompare(b[0]));
-    const group = (k) => files.filter(([, v]) => v.status === k);
-    const LABEL = { loaded: 'Loaded', error: 'Couldn\'t read', skipped: 'Not a TL Sheet or BEO', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
-    const summary = ['loaded', 'error', 'shortcut', 'skipped', 'old'].map((k) => [k, group(k)]).filter(([, g]) => g.length);
-    // Shortcuts only hold a web address. Point at the SharePoint site(s) they lead to, so the real
-    // library can be synced to File Explorer and linked instead.
-    const sites = [...new Set(group('shortcut').map(([, v]) => v.site).filter(Boolean))];
-    const shortcutHelp = group('shortcut').length ? `<div class="shortcut-help">
+    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet or BEO', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
+    const boxes = folders.map((f) => {
+      const st = fstate(f.id);
+      const files = Object.entries(st.files || {}).sort((a, b) => a[0].localeCompare(b[0]));
+      const group = (k) => files.filter(([, v]) => v.status === k);
+      const summary = ['loaded', 'older', 'error', 'shortcut', 'skipped', 'old'].map((k) => [k, group(k)]).filter(([, g]) => g.length);
+      // Shortcuts only hold a web address. Point at the SharePoint site(s) they lead to, so the real
+      // library can be synced to File Explorer and linked instead.
+      const sites = [...new Set(group('shortcut').map(([, v]) => v.site).filter(Boolean))];
+      const shortcutHelp = group('shortcut').length ? `<div class="shortcut-help">
         <strong>This folder has shortcuts (.url), not the actual files.</strong>
         <p>A shortcut only stores a web address, and the browser can't open SharePoint files from it. To link the real files:</p>
         <ol>
@@ -624,25 +665,37 @@
           <li>Click <b>Sync</b>, or <b>Add shortcut to My files</b>. It then appears in File Explorer under <i>Crown Resorts</i> or <i>OneDrive - Crown Resorts</i>.</li>
           <li>Back here, click <b>Change folder</b> and choose that synced folder.</li>
         </ol></div>` : '';
-    panel.innerHTML = `<div class="folder-box"><strong>📁 ${esc(folderName())}</strong>
-      <p class="muted small">${folderPerm === 'granted'
-        ? (scanning ? `Checking files ${scanProgress}…` : `Checked ${st && st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st && st.found != null ? ` · ${st.found} files found` : ''} · checks every minute while open; files OneDrive has updated are re-read automatically.`)
-        : 'The browser needs your OK again before it can read this folder.'}</p>
-      <div class="row">
-        ${folderPerm === 'granted' ? '<button class="btn primary sm" type="button" data-folder="scan">Check now</button><button class="btn sm" type="button" data-folder="reread">Re-read all</button>' : '<button class="btn primary sm" type="button" data-folder="reconnect">Reconnect</button>'}
-        <button class="btn sm" type="button" data-folder="link">Change folder</button>
-        <button class="btn sm danger" type="button" data-folder="unlink">Unlink</button>
-      </div>
-      ${shortcutHelp}
-      ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
-        `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
-    </div>`;
+      const ok = f.perm === 'granted';
+      return `<div class="folder-box"><strong>📁 ${esc(fname(f))}</strong>
+        <p class="muted small">${ok
+          ? (scanningId === f.id ? `Checking files ${scanProgress}…` : `Checked ${st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st.found != null ? ` · ${st.found} files found` : ''}`)
+          : 'The browser needs your OK again before it can read this folder.'}</p>
+        <div class="row">
+          ${ok ? `<button class="btn sm" type="button" data-folder="reread" data-id="${f.id}">Re-read all</button>` : `<button class="btn primary sm" type="button" data-folder="reconnect">Reconnect</button>`}
+          <button class="btn sm" type="button" data-folder="change" data-id="${f.id}">Change folder</button>
+          <button class="btn sm danger" type="button" data-folder="unlink" data-id="${f.id}">Unlink</button>
+        </div>
+        ${shortcutHelp}
+        ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
+          `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
+      </div>`;
+    });
+    panel.innerHTML = `${boxes.join('')}
+      <div class="folder-box ${folders.length ? 'add-box' : ''}">
+        ${folders.length ? '' : `<strong>No folder linked</strong>
+        <p class="muted small">Link the folders where TL Sheets and BEOs are saved, e.g. the SharePoint TL folder synced to File Explorer, and a folder you save BEOs into. New or updated files load automatically.</p>`}
+        <div class="row">
+          <button class="btn primary sm" type="button" data-folder="link">📁 ${folders.length ? 'Link another folder' : 'Link folder'}</button>
+          ${folders.length ? '<button class="btn sm" type="button" data-folder="scan">Check all now</button>' : ''}
+        </div>
+        ${folders.length ? '<p class="muted small">All linked folders are checked every minute while the dashboard is open.</p>' : ''}
+      </div>`;
   }
 
   function folderButton() {
-    if (!folderHandle) linkFolder();
-    else if (folderPerm !== 'granted') reconnectFolder();
-    else scanFolder(true);
+    if (!folders.length) linkFolder();
+    else if (needsOk().length) reconnectFolders();
+    else scanAll(true);
   }
 
   function removeSource(id, silent) {
@@ -657,7 +710,7 @@
   function renderSources() {
     renderFolder();
     $('sourceList').innerHTML = state.sources.length ? state.sources.map((s) => `<li>
-      <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
+      <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
       : '<li class="empty">No documents loaded.</li>';
   }
@@ -694,12 +747,14 @@
     $('btnFolder').onclick = folderButton;
     $('folderPanel').onclick = (e) => {
       const a = e.target.closest('[data-folder]'); if (!a) return;
-      ({ link: linkFolder, scan: () => scanFolder(true), reread: rereadFolder, reconnect: reconnectFolder, unlink: unlinkFolder })[a.dataset.folder]();
+      const id = a.dataset.id;
+      ({ link: () => linkFolder(), change: () => linkFolder(id), scan: () => scanAll(true), reread: () => rereadFolder(id),
+        reconnect: reconnectFolders, unlink: () => unlinkFolder(id) })[a.dataset.folder]();
     };
     // Look for new documents every few minutes, and whenever the dashboard comes back into view.
     // Every minute: only files whose saved time changed are re-read, so this stays light.
-    setInterval(() => { if (!document.hidden) scanFolder(false); }, 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) scanFolder(false); });
+    setInterval(() => { if (!document.hidden) scanAll(false); }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) scanAll(false); });
     $('fileInput').onchange = async (e) => {
       const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, buf: await f.arrayBuffer() })));
       handleFiles(files);
@@ -719,7 +774,7 @@
     $('btnClear').onclick = () => {
       if (!confirm('Remove all loaded documents from this dashboard?')) return;
       state.sources = []; state.events = []; state.shifts = [];
-      if (state.folder) { state.folder.seen = {}; state.folder.files = {}; }   // next folder check reloads everything
+      for (const st of Object.values(state.folders || {})) { st.seen = {}; st.files = {}; }   // next folder check reloads everything
       save(); render(); renderSources();
     };
     $('btnSample').onclick = loadSample;
@@ -805,5 +860,9 @@
 
   load(); wire(); render(); initFolder();
   // Test hook: lets automated tests link a folder handle without the native picker.
-  window.__crownTestLinkFolder = async (h) => { folderHandle = h; folderPerm = 'granted'; state.folder = { name: h.name, seen: {}, files: {} }; await scanFolder(true); };
+  window.__crownTestLinkFolder = async (h) => {
+    const id = 't' + folders.length; folders.push({ id, handle: h, perm: 'granted' });
+    state.folders = state.folders || {}; state.folders[id] = { seen: {}, files: {}, readerVersion: READER_VERSION };
+    await scanAll(true, id);
+  };
 })();
