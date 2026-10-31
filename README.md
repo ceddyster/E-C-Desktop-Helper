@@ -35,7 +35,7 @@ Example files to try are in `samples/`. **Documents → Load sample data** fills
 
 ### Linked folder (automatic)
 
-Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are saved. Sub-folders up to 3 levels deep are included. From then on, the dashboard:
+Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are saved. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
 
 - loads every TL workbook and BEO PDF in the folder, skipping files untouched for more than 60 days on the first check
 - checks again every few minutes while it's open, and whenever you switch back to its tab, loading only new or changed files

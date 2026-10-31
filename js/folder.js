@@ -6,7 +6,7 @@
   'use strict';
   const DB = 'crownDash', STORE = 'handles', KEY = 'folder';
   const WANT = /\.(xlsx|xlsm|xls|pdf|ics)$/i;
-  const MAX_DEPTH = 3;
+  const MAX_DEPTH = 6;
 
   function idb() {
     return new Promise((res, rej) => {
@@ -45,7 +45,7 @@
     return p;
   }
 
-  /** Lists TL/BEO-type files (sub-folders up to 3 deep). Skips Office lock files (~$…). */
+  /** Lists TL/BEO-type files (sub-folders up to 6 deep). Skips Office lock files (~$…). */
   async function list(h, prefix = '', depth = 0, out = []) {
     for await (const [name, entry] of h.entries()) {
       if (name.startsWith('~$') || name.startsWith('.')) continue;
