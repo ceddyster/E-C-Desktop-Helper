@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crown Work Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="crest" aria-hidden="true">♛</span>
+      <div>
+        <h1>Crown Work Dashboard</h1>
+        <p class="muted" id="todayLabel"></p>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnLoad" title="Pick files from your G: drive (Google Drive for Desktop) or any folder">
+        📂 Load documents
+      </button>
+      <button class="btn" id="btnDrive" hidden title="Pick files straight from Google Drive (needs config.js)">
+        ☁️ Google Drive
+      </button>
+      <button class="btn ghost" id="btnSources">Documents <span class="pill" id="sourceCount">0</span></button>
+      <button class="btn ghost" id="btnSettings" aria-label="Settings">⚙︎</button>
+      <input type="file" id="fileInput" multiple hidden
+             accept=".xlsx,.xls,.xlsm,.csv,.tsv,.ics,.json">
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- DAILY OVERVIEW -->
+    <section class="card daily" aria-labelledby="dailyTitle">
+      <div class="card-head">
+        <div>
+          <h2 id="dailyTitle">Today</h2>
+          <p class="muted" id="dailyDate"></p>
+        </div>
+        <div class="seg">
+          <button class="btn sm" id="dayPrev" aria-label="Previous day">‹</button>
+          <button class="btn sm" id="dayToday">Today</button>
+          <button class="btn sm" id="dayNext" aria-label="Next day">›</button>
+        </div>
+      </div>
+      <div class="daily-body">
+        <div>
+          <h3 class="label">Events</h3>
+          <ul class="event-list" id="dailyEvents"></ul>
+        </div>
+        <div>
+          <h3 class="label">On shift</h3>
+          <ul class="shift-list" id="dailyShifts"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="card calendar" aria-labelledby="calTitle">
+      <div class="card-head">
+        <h2 id="calTitle">Calendar</h2>
+        <div class="seg">
+          <label class="toggle"><input type="checkbox" id="onlyMine"> Only mine</label>
+          <button class="btn sm" id="calPrev" aria-label="Previous month">‹</button>
+          <span class="month-label" id="calMonth"></span>
+          <button class="btn sm" id="calNext" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div class="cal-wrap">
+        <div class="cal-grid" id="calGrid" role="grid"></div>
+        <aside class="upcoming">
+          <h3 class="label">Next 7 days</h3>
+          <ul id="upcomingList"></ul>
+        </aside>
+      </div>
+    </section>
+
+    <!-- PLACEHOLDERS -->
+    <section class="card placeholder"><span>Add-on slot 1</span></section>
+    <section class="card placeholder"><span>Add-on slot 2</span></section>
+    <section class="card placeholder"><span>Add-on slot 3</span></section>
+    <section class="card placeholder"><span>Add-on slot 4</span></section>
+  </main>
+
+  <!-- IMPORT REVIEW -->
+  <dialog id="importDlg" class="dlg wide">
+    <form method="dialog" class="dlg-inner">
+      <div class="card-head">
+        <h2>Review documents</h2>
+        <button class="btn ghost sm" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <p class="muted">I've guessed what each sheet is and which columns matter. Fix anything that's wrong, then import. Re-importing a file with the same name replaces its old data.</p>
+      <div id="importList"></div>
+      <div class="dlg-foot">
+        <button class="btn" value="cancel">Cancel</button>
+        <button class="btn primary" id="btnImport" value="ok">Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- SOURCES -->
+  <dialog id="sourcesDlg" class="dlg">
+    <form method="dialog" class="dlg-inner">
+      <div class="card-head">
+        <h2>Loaded documents</h2>
+        <button class="btn ghost sm" value="close" aria-label="Close">✕</button>
+      </div>
+      <ul class="source-list" id="sourceList"></ul>
+      <div class="dlg-foot">
+        <button class="btn" type="button" id="btnSample">Load sample data</button>
+        <button class="btn danger" type="button" id="btnClear">Clear everything</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- SETTINGS -->
+  <dialog id="settingsDlg" class="dlg">
+    <form method="dialog" class="dlg-inner">
+      <div class="card-head">
+        <h2>Settings</h2>
+        <button class="btn ghost sm" value="close" aria-label="Close">✕</button>
+      </div>
+      <label class="field">Your name (as it appears in rosters)
+        <input type="text" id="myName" placeholder="e.g. Cedric">
+      </label>
+      <p class="muted small">Events and shifts that mention this name get highlighted and count as "mine".</p>
+      <div class="dlg-foot">
+        <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="config.js"></script>
+  <script src="js/parse.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
