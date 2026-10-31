@@ -48,7 +48,7 @@ Your work's Google Workspace admin may need to allow the app.
 
 ## Opening it on your work computer
 
-- **GitHub Pages**: Repo → Settings → Pages → *Deploy from a branch* → pick the branch and `/ (root)`. Pages on a private repo needs a paid GitHub plan.
+- **GitHub Pages** (live at **https://ceddyster.github.io/E-C-Desktop-Helper/** once switched on): Repo → Settings → Pages → *Source: Deploy from a branch* → branch `claude/crown-work-dashboard-xylp3o`, folder `/ (root)` → Save. The first build takes a minute or two. The code is public, but your documents never leave your browser.
 - **Or just open it locally**: download the repo as a ZIP and double-click `index.html`. Everything works offline because the spreadsheet library is bundled in `vendor/`.
 
 ## Files
