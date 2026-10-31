@@ -12,7 +12,7 @@
   'use strict';
 
   const SECTION_HEADINGS = /^(menu|program|dietary requirements|beverage|technical requirement|health and safety|miscellaneous|setup|billing instructions|package|audio visual|entertainment|accommodation)$/i;
-  const NON_GUEST = /client access|bump|crew|set ?up|pack ?(down|up)|rehearsal|storage|hold|load ?(in|out)|delivery|access/i;
+  const NON_GUEST = /client access|bump|crew|set ?up|pack ?(down|up)|rehearsal|storage|hold|load ?(in|out)|delivery|access|green ?room|teardown|tear down|briefing|office|storeroom/i;
 
   let loading = null;
   function loadScript(src) {
@@ -166,9 +166,15 @@
       const hd = p1.map((i) => global.CrownParse.toISODate(i.str)).find(Boolean);
       if (hd) byDate.set(hd, []);
     }
+    // A day that only has bump in/out, crew catering, green rooms etc. (e.g. a bump out after midnight)
+    // isn't an event day: its rows are listed under the main event's function times instead.
+    const isGuest = (f) => !NON_GUEST.test(f.event);
+    let eventDates = [...byDate.keys()].filter((d) => byDate.get(d).some(isGuest));
+    if (!eventDates.length) eventDates = [...byDate.keys()].slice(0, 1);
     const events = [];
-    for (const [date, fns] of byDate) {
-      const guest = fns.filter((f) => !NON_GUEST.test(f.event));
+    for (const date of eventDates) {
+      const fns = byDate.get(date);
+      const guest = fns.filter(isGuest);
       const use = guest.length ? guest : fns;
       // Main function: the one named like the BEO ("DINNER"), else the biggest (later wins ties).
       const named = info.beoName && use.find((f) => f.event.toLowerCase() === info.beoName.toLowerCase());
@@ -180,7 +186,8 @@
       events.push({
         date, title: booking, subtitle: info.beoName, start: starts[0] || null, end: ends[ends.length - 1] || null,
         venue: main.venue || '', pax: main.gtd ? String(main.gtd) : '', notes: '', staff: [],
-        beo: Object.assign({}, info, { functions: fns, beverage }),
+        // Function times: this day's rows, plus rows from neighbouring non-event days (bump in/out).
+        beo: Object.assign({}, info, { functions: rows.filter((f) => f.date === date || !eventDates.includes(f.date)), beverage }),
       });
     }
     const warnings = [];

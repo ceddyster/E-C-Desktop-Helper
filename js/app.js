@@ -244,7 +244,7 @@
     const meta = [e.venue && !e.noBEO && !e.setup ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
     const barLine = [e.bars && e.bars.length && `Bar: ${e.bars.join(' / ')}`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
     const fns = b && b.functions && b.functions.length ? `<details class="more-info"><summary>Function times</summary><table>${b.functions.map((f) =>
-      `<tr><td>${f.start ? fmtTime(f.start) + '–' + fmtTime(f.end) : ''}</td><td>${esc(f.event)}</td><td>${esc(f.venue)}</td><td>${f.gtd ? f.gtd + ' gtd' : ''}</td></tr>`).join('')}</table></details>` : '';
+      `<tr><td>${f.date && f.date !== e.date ? `<b>${esc(fmtShort(f.date))}</b> ` : ''}${f.start ? fmtTime(f.start) + '–' + fmtTime(f.end) : ''}</td><td>${esc(f.event)}</td><td>${esc(f.venue)}</td><td>${f.gtd ? f.gtd + ' gtd' : ''}</td></tr>`).join('')}</table></details>` : '';
     const bev = b && b.beverage && b.beverage.length ? `<details class="more-info"><summary>Beverage</summary><ul>${b.beverage.map((l) =>
       /^\d{1,2}:\d{2}\s*-/.test(l) ? `<li class="sub">${esc(l)}</li>` : `<li>${esc(l)}</li>`).join('')}</ul></details>` : '';
     return `<div class="event-card ${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
@@ -505,7 +505,7 @@
 
   /** Imports TL Sheets / BEOs that are new or changed since the last check. */
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 5;
+  const READER_VERSION = 6;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let scanProgress = '';
 
