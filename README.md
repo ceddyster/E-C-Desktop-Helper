@@ -38,7 +38,8 @@ Example files to try are in `samples/`. **Documents → Load sample data** fills
 Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are saved. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
 
 - loads every TL workbook and BEO PDF in the folder, skipping files untouched for more than 60 days on the first check
-- checks again every few minutes while it's open, and whenever you switch back to its tab, loading only new or changed files
+- checks every minute while it's open, and whenever you switch back to its tab. Any file whose saved time has changed is re-read, so edits to a TL workbook replace that week's shifts. A message names the files that were updated, and **Documents** shows each file's last-saved time.
+- note that edits made in SharePoint reach the synced folder only once OneDrive has downloaded them, usually within a minute or a few. For quickest updates, right-click the synced folder → **Always keep on this device**.
 - ignores Office lock files (`~$…`) and lists anything it couldn't use under **Documents → skipped**
 
 **SharePoint:** open the document library in the browser and click **Sync** (or **Add shortcut to My files**). It then appears in File Explorer under *OneDrive - Crown Resorts*. Link that folder.

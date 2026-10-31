@@ -346,7 +346,7 @@
       events.forEach((e, i) => { e.id = `${id}#e${i}`; e.source = id; });
       shifts.forEach((s, i) => { s.id = `${id}#s${i}`; s.source = id; });
       state.events.push(...events); state.shifts.push(...shifts);
-      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder });
+      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null });
       ne += events.length; ns += shifts.length;
       events.concat(shifts).forEach((x) => x.date && dates.push(x.date));
     }
@@ -427,6 +427,7 @@
         todo.push(f);
       }
       todo.sort((a, b) => a.lastModified - b.lastModified);   // oldest first, so the newest version wins
+      const newNames = [], updatedNames = [];
       let batch = [];
       const flush = () => { if (batch.length) { commitEntries(batch, true); loadedNow += batch.length; batch = []; save(); render(); } };
       for (let n = 0; n < todo.length; n++) {
@@ -436,9 +437,10 @@
         try {
           const entry = await prepare(f.name, await f.file.arrayBuffer());
           if (entry.auto) {
-            entry.fromFolder = true; batch.push(entry);
+            entry.fromFolder = true; entry.fileSaved = f.lastModified; entry.path = f.path; batch.push(entry);
+            (st.seen[f.path] != null ? updatedNames : newNames).push(f.name.replace(/\.[a-z0-9]+$/i, ''));
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
-            st.files[f.path] = { status: 'loaded', detail: entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}` };
+            st.files[f.path] = { status: 'loaded', saved: f.lastModified, detail: entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}` };
           } else {
             st.files[f.path] = { status: 'skipped', detail: 'not a TL Sheet (no bar tabs) or BEO' };
           }
@@ -456,8 +458,11 @@
       save(); render();
       const shortcuts = Object.values(st.files).filter((v) => v.status === 'shortcut').length;
       if (!loadedNow && shortcuts) toast(`📁 This folder holds ${shortcuts} shortcut${shortcuts === 1 ? '' : 's'} (.url), not the files. Open Documents to see how to fix it.`);
-      else if (loadedNow) toast(`📁 ${loadedNow} new or updated document${loadedNow === 1 ? '' : 's'} loaded from ${folderName()}.`);
-      else if (verbose) toast(files.length ? `📁 ${folderName()} checked. Nothing new. See Documents for details.` : `📁 No spreadsheets or PDFs found in ${folderName()}.`);
+      else if (loadedNow) {
+        const list = (a) => (a.length > 2 ? `${a.slice(0, 2).join(', ')} +${a.length - 2} more` : a.join(', '));
+        toast(`📁 ${[updatedNames.length && `Updated: ${list(updatedNames)}`, newNames.length && `New: ${list(newNames)}`].filter(Boolean).join(' · ')}`);
+      }
+      else if (verbose) toast(files.length ? `📁 ${folderName()} checked. No files have changed since the last check.` : `📁 No spreadsheets or PDFs found in ${folderName()}.`);
     } catch (e) {
       if (e.name === 'NotAllowedError' || e.name === 'SecurityError') folderPerm = 'prompt';
       else if (e.name === 'NotFoundError') toast('📁 The linked folder can\'t be found. Was it moved or renamed? Link it again.');
@@ -511,7 +516,7 @@
         </ol></div>` : '';
     panel.innerHTML = `<div class="folder-box"><strong>📁 ${esc(folderName())}</strong>
       <p class="muted small">${folderPerm === 'granted'
-        ? (scanning ? `Checking files ${scanProgress}…` : `Checked ${st && st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st && st.found != null ? ` · ${st.found} files found` : ''} · rechecks every few minutes while open.`)
+        ? (scanning ? `Checking files ${scanProgress}…` : `Checked ${st && st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st && st.found != null ? ` · ${st.found} files found` : ''} · checks every minute while open; files OneDrive has updated are re-read automatically.`)
         : 'The browser needs your OK again before it can read this folder.'}</p>
       <div class="row">
         ${folderPerm === 'granted' ? '<button class="btn primary sm" type="button" data-folder="scan">Check now</button><button class="btn sm" type="button" data-folder="reread">Re-read all</button>' : '<button class="btn primary sm" type="button" data-folder="reconnect">Reconnect</button>'}
@@ -520,7 +525,7 @@
       </div>
       ${shortcutHelp}
       ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
-        `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
+        `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
     </div>`;
   }
 
@@ -537,10 +542,12 @@
     if (!silent) { save(); render(); renderSources(); }
   }
 
+  const fmtSaved = (ms) => new Date(ms).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
   function renderSources() {
     renderFolder();
     $('sourceList').innerHTML = state.sources.length ? state.sources.map((s) => `<li>
-      <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts · loaded ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}</div></div>
+      <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
       : '<li class="empty">No documents loaded.</li>';
   }
@@ -580,7 +587,8 @@
       ({ link: linkFolder, scan: () => scanFolder(true), reread: rereadFolder, reconnect: reconnectFolder, unlink: unlinkFolder })[a.dataset.folder]();
     };
     // Look for new documents every few minutes, and whenever the dashboard comes back into view.
-    setInterval(() => { if (!document.hidden) scanFolder(false); }, 3 * 60000);
+    // Every minute: only files whose saved time changed are re-read, so this stays light.
+    setInterval(() => { if (!document.hidden) scanFolder(false); }, 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) scanFolder(false); });
     $('fileInput').onchange = async (e) => {
       const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, buf: await f.arrayBuffer() })));
