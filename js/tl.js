@@ -16,7 +16,8 @@
   const P = () => global.CrownParse;
 
   const DAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  const BAR_TAB = /^\s*(MON|TUE|WED|THU|FRI|SAT|SUN)[A-Z]*\s*-\s*BARS?\b/i;
+  // MON-BAR, FRI-BAR (1), MON BAR, Monday Bars, BAR - MON … (but not MON- GB, MON-SET UP, etc.)
+  const BAR_TAB = /^\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b.*\bbars?\b|^\s*bars?\b.*\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i;
   const NOT_WORKING = /^(rej|rejected|cancel+ed|cxl|no show|ns|sick|off)$/i;
 
   const isBarTab = (name) => BAR_TAB.test(name);
@@ -66,7 +67,7 @@
       }
     }
     if (!date) {
-      const ws = weekStartFromName(fileName), day = DAYS.indexOf(sheetName.trim().slice(0, 3).toUpperCase());
+      const ws = weekStartFromName(fileName), dm = sheetName.toUpperCase().match(/\b(MON|TUE|WED|THU|FRI|SAT|SUN)/), day = dm ? DAYS.indexOf(dm[1]) : -1;
       if (ws && day >= 0) { ws.setDate(ws.getDate() + day); date = P().isoOf(ws); }
     }
     if (!date) return { events: [], shifts: [], warnings: [`${sheetName}: couldn't work out the date.`] };

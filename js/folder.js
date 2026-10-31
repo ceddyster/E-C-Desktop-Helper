@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
   const DB = 'crownDash', STORE = 'handles', KEY = 'folder';
-  const WANT = /\.(xlsx|xlsm|xls|pdf|ics)$/i;
+  const WANT = /\.(xlsx|xlsm|xlsb|xls|pdf|ics)$/i;
   const MAX_DEPTH = 6;
 
   function idb() {
@@ -55,7 +55,10 @@
         try {
           const file = await entry.getFile();
           out.push({ path: prefix + name, name, lastModified: file.lastModified, file });
-        } catch (_) { /* cloud-only file that couldn't be fetched right now; try next scan */ }
+        } catch (e) {
+          // Usually a cloud-only file OneDrive couldn't fetch right now. Reported, and tried again next check.
+          out.push({ path: prefix + name, name, error: e.message || String(e) });
+        }
       }
     }
     return out;

@@ -277,9 +277,20 @@
     if (!global.XLSX) throw new Error('Spreadsheet library failed to load.');
     // CSVs are read as plain text so "3/11/2026" stays day-first (SheetJS would read it as US m/d).
     const isText = /\.(csv|tsv|txt)$/i.test(name);
+    if (!isText && global.CrownTL) {
+      // TL workbooks have dozens of tabs: list the tab names first, then open only the bar tabs.
+      const names = global.XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames;
+      const bars = names.filter(global.CrownTL.isBarTab);
+      if (bars.length) {
+        const wbBars = global.XLSX.read(buf, { type: 'array', cellDates: true, sheets: bars });
+        wbBars.SheetNames = names;
+        return [global.CrownTL.readTLWorkbook(wbBars, name)];
+      }
+      if (/(^|[^a-z])tl([^a-z]|$)/i.test(name)) {
+        throw new Error(`looks like a TL Sheet but has no bar tabs. Tabs: ${names.slice(0, 15).join(', ')}${names.length > 15 ? '…' : ''}`);
+      }
+    }
     const wb = global.XLSX.read(buf, isText ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
-    const tl = global.CrownTL && global.CrownTL.readTLWorkbook(wb, name);
-    if (tl) return [tl];
     return wb.SheetNames.map((sn) => {
       const rows = global.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '', blankrows: false });
       return analyseRows(rows, wb.SheetNames.length > 1 ? sn : '', name);
