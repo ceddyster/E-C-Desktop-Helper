@@ -325,12 +325,8 @@
   /** Reads one file → [{label, kind, ...sheet}] or a ready result for ics/json. */
   async function readFile(name, buf) {
     const ext = (name.split('.').pop() || '').toLowerCase();
-    if (ext === 'url' || ext === 'website') {
-      // Windows internet shortcut: [InternetShortcut] URL=https://...
-      const m = new TextDecoder().decode(buf).match(/^URL=(https:\/\/\S+)/mi);
-      if (!m) throw new Error('No web address found in this shortcut.');
-      return [{ label: '', kind: 'link', url: m[1].trim() }];
-    }
+    if (ext === 'pdf') return global.CrownBEO.readBEO(name, buf);
+    if (ext === 'url' || ext === 'website') throw new Error('That\'s a shortcut, not the workbook. Download the TL Sheet (File → Create a Copy → Download a Copy) and load the .xlsx.');
     if (ext === 'ics') {
       const events = parseIcs(new TextDecoder().decode(buf));
       return [{ label: '', kind: 'ready', ready: { events, shifts: [], warnings: events.length ? [] : ['No events found in this calendar file.'] } }];

@@ -6,12 +6,12 @@
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   /* ---------- State ---------- */
-  let state = { sources: [], events: [], shifts: [], myName: '', tl: { url: '', lastImport: null } };
+  let state = { sources: [], events: [], shifts: [], myName: '' };
   const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), onlyMine: false, calMode: 'shifts' };
 
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = Object.assign(state, s); } catch (_) {}
-    state.tl = Object.assign({ url: '', lastImport: null }, state.tl, { editing: false });
+    delete state.tl;
     try { view.onlyMine = localStorage.getItem(STORE + '.onlyMine') === '1'; } catch (_) {}
     try { view.calMode = localStorage.getItem(STORE + '.calMode') || 'shifts'; } catch (_) {}
   }
@@ -43,7 +43,7 @@
     const a = n.split(/\s+/), b = me.split(/\s+/);
     return (a.length === 1 || b.length === 1) && a[0] === b[0];
   }
-  const eventIsMine = (e) => (e.staff || []).some(isMe) || isMe(e.manager);
+  const eventIsMine = (e) => (e.staff || []).some(isMe) || isMe(e.manager) || (e.barStaff || []).some((d) => isMe(d.name));
 
   let toastTimer;
   function toast(msg) {
@@ -51,9 +51,42 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
   }
 
-  function eventsOn(iso) {
-    return state.events.filter((e) => e.date === iso && (!view.onlyMine || eventIsMine(e))).sort(byTime);
+  /* BEOs are the events. The TL sheet's Duties column names the event each bar team works,
+   * so TL groups are attached to the BEO with the same name on the same day. TL duties with
+   * no matching BEO still show, flagged, so a name mismatch is easy to spot. */
+  const STOP = new Set(['the', 'of', 'and', 'for', 'a', 'an', 'at', 'in', 'on', 'to']);
+  const normName = (s) => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+  function namesMatch(x, y) {
+    const a = normName(x), b = normName(y);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (Math.min(a.length, b.length) >= 6 && (a.includes(b) || b.includes(a))) return true;
+    const ta = new Set(a.split(' ').filter((w) => !STOP.has(w))), tb = new Set(b.split(' ').filter((w) => !STOP.has(w)));
+    const shared = [...ta].filter((w) => tb.has(w)).length;
+    return shared >= 2 && shared / Math.min(ta.size, tb.size) >= 0.75;
   }
+  function beoMatches(beo, duty) {
+    return namesMatch(duty, beo.title) || (beo.subtitle && namesMatch(duty, `${beo.title} ${beo.subtitle}`))
+      || (beo.beo && beo.beo.account && namesMatch(duty, beo.beo.account));
+  }
+  function dayEvents(iso) {
+    const all = state.events.filter((e) => e.date === iso);
+    const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [] }));
+    const out = [...main];
+    for (const t of all.filter((e) => e.fromTL)) {
+      const m = main.find((b) => b.beo && beoMatches(b, t.title));
+      if (m) {
+        m.barStaff.push(...(t.staffDetail || []));
+        m.bars = [...new Set([...m.bars, ...(t.bars || [])])];
+        if (t.notes) m.barNotes.push(t.notes);
+        m.manager = m.manager || t.manager;
+      } else {
+        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], noBEO: true }));
+      }
+    }
+    return out.sort(byTime);
+  }
+  function eventsOn(iso) { return dayEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e)); }
   function shiftsOn(iso) { return state.shifts.filter((s) => s.date === iso).sort(byTime); }
   function calShiftsOn(iso) { return shiftsOn(iso).filter((s) => !view.onlyMine || isMe(s.person)); }
   // "Leisly Tuesta Melendez" → "Leisly T." to fit calendar cells.
@@ -77,7 +110,7 @@
     $('todayLabel').textContent = fmtLong(todayISO());
     $('sourceCount').textContent = state.sources.length;
     $('onlyMine').checked = view.onlyMine;
-    renderDaily(); renderCalendar(); renderUpcoming(); renderTL();
+    renderDaily(); renderCalendar(); renderUpcoming();
   }
 
   function emptyState(msg, withButton) {
@@ -91,27 +124,44 @@
     const noData = !state.events.length && !state.shifts.length;
 
     const evs = eventsOn(iso);
-    $('dailyEvents').innerHTML = evs.length ? evs.map((e) => {
-      const staff = staffFor(e);
-      const meta = [e.venue && (e.team === 'Bars' ? `Bar: ${e.venue}` : e.venue), e.pax && `${e.pax} pax`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
-      const detail = e.staffDetail && e.staffDetail.length ? e.staffDetail : null;
-      return `<li class="${eventIsMine(e) ? 'mine' : ''}">
-        <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
-        <div>
-          <div class="event-title">${esc(e.title)}</div>
-          ${meta ? `<div class="event-meta">${meta}</div>` : ''}
-          ${e.notes ? `<div class="event-meta">${esc(e.notes)}</div>` : ''}
-          <div class="chips">${detail
-            ? detail.map((d) => `<span class="chip ${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}${d.bar && e.bars && e.bars.length > 1 ? ` · ${esc(d.bar)}` : ''}</span>`).join('')
-            : staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>'}</div>
-        </div></li>`;
-    }).join('') : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
+    $('dailyEvents').innerHTML = evs.length ? evs.map(eventCard).join('') : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
 
     const sh = shiftsOn(iso);
     $('dailyShifts').innerHTML = sh.length ? sh.map((s) => `<li class="${isMe(s.person) ? 'mine' : ''}">
-        <span class="who">${esc(s.person)}${s.role ? ` <span class="muted small">${esc(s.role)}</span>` : ''}</span>
+        <span class="who">${esc(s.person)}${s.role ? ` <span class="muted small">${esc(s.role)}</span>` : ''}${s.duty ? `<br><span class="muted small">${esc(s.duty)}</span>` : ''}</span>
         <span class="when">${s.start ? `${fmtTime(s.start)}${s.end ? '–' + fmtTime(s.end) : ''}` : esc(s.label)}</span></li>`).join('')
       : emptyState(state.shifts.length ? 'Nobody rostered.' : 'Load a roster to see who\'s on.');
+  }
+
+  function eventCard(e) {
+    const b = e.beo;
+    const sub = [b && b.beoName, b && b.number && `BEO #${b.number}`, b && b.eventManager && `EM: ${b.eventManager}`].filter(Boolean).map(esc).join(' · ');
+    const meta = [e.venue && !e.noBEO ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
+    const barLine = [e.bars && e.bars.length && `Bar: ${e.bars.join(' / ')}`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
+    let chips;
+    if (e.barStaff && (e.barStaff.length || b)) {
+      chips = e.barStaff.length
+        ? e.barStaff.map((d) => `<span class="chip ${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}${d.bar && e.bars.length > 1 ? ` · ${esc(d.bar)}` : ''}</span>`).join('')
+        : '<span class="chip none">No bar staff on the TL sheet</span>';
+    } else {
+      const staff = staffFor(e);
+      chips = staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>';
+    }
+    const fns = b && b.functions && b.functions.length ? `<details class="more-info"><summary>Function times</summary><table>${b.functions.map((f) =>
+      `<tr><td>${f.start ? fmtTime(f.start) + '–' + fmtTime(f.end) : ''}</td><td>${esc(f.event)}</td><td>${esc(f.venue)}</td><td>${f.gtd ? f.gtd + ' gtd' : ''}</td></tr>`).join('')}</table></details>` : '';
+    const bev = b && b.beverage && b.beverage.length ? `<details class="more-info"><summary>Beverage</summary><ul>${b.beverage.map((l) =>
+      /^\d{1,2}:\d{2}\s*-/.test(l) ? `<li class="sub">${esc(l)}</li>` : `<li>${esc(l)}</li>`).join('')}</ul></details>` : '';
+    return `<li class="${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
+      <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
+      <div>
+        <div class="event-title">${esc(e.title)}${e.noBEO ? ' <span class="tag">TL only · no matching BEO</span>' : ''}</div>
+        ${sub ? `<div class="event-meta">${sub}</div>` : ''}
+        ${meta ? `<div class="event-meta">${meta}</div>` : ''}
+        ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
+        ${(e.barNotes || []).concat(e.barStaff ? [] : [e.notes]).filter(Boolean).map((n) => `<div class="event-meta note">${esc(n)}</div>`).join('')}
+        <div class="chips">${chips}</div>
+        ${fns}${bev}
+      </div></li>`;
   }
 
   function renderCalendar() {
@@ -176,20 +226,24 @@
   /* ---------- Import flow ---------- */
   let pending = []; // [{fileName, sheets:[analysed]}]
 
-  async function handleFiles(files, opts) {
-    opts = opts || {};
+  async function handleFiles(files) {
     pending = [];
     const errors = [];
     for (const f of files) {
       try {
         const sheets = await P.readFile(f.name, f.buf);
-        if (sheets[0] && sheets[0].kind === 'link') { setTLLink(sheets[0].url); continue; }
-        // TL Sheet copies always replace the previous copy, whatever the download was called.
-        if (sheets[0] && sheets[0].isTL) opts = Object.assign({}, opts, { tl: true });
-        // TL workbooks are weekly ("TL 26.10.2026-1.11.2026.xlsx"): one source per week, and a
-        // re-download of the same week ("… (1).xlsx") replaces it.
-        const week = f.name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)\s*$/, '').trim();
-        pending.push(opts.tl ? { fileName: f.name, sheets, sourceId: 'src:tl:' + week.toLowerCase(), displayName: week } : { fileName: f.name, sheets });
+        const first = sheets[0] || {};
+        if (first.isTL) {
+          // TL workbooks are weekly ("TL 26.10.2026-1.11.2026.xlsx"): one source per week, and a
+          // re-download of the same week ("… (1).xlsx") replaces it.
+          const week = f.name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+          pending.push({ fileName: f.name, sheets, sourceId: 'src:tl:' + week.toLowerCase(), displayName: week });
+        } else if (first.isBEO && first.beoNumber) {
+          // A revised BEO ("… (6).pdf") replaces the earlier version with the same BEO number.
+          pending.push({ fileName: f.name, sheets, sourceId: 'src:beo:' + first.beoNumber, displayName: first.label });
+        } else {
+          pending.push({ fileName: f.name, sheets });
+        }
       } catch (e) { errors.push(`${f.name}: ${e.message}`); }
     }
     if (errors.length) toast(errors.join(' · '));
@@ -301,64 +355,6 @@
       : '<li class="empty">No documents loaded.</li>';
   }
 
-  /* ---------- TL Sheet ---------- */
-  function setTLLink(raw) {
-    let u;
-    try { u = new URL(String(raw).trim()); } catch (_) { toast('That doesn\'t look like a web link.'); return false; }
-    if (u.protocol !== 'https:') { toast('The link should start with https://'); return false; }
-    state.tl.url = u.href; state.tl.editing = false; save(); renderTL();
-    toast('TL Sheet link saved.');
-    return true;
-  }
-
-  function renderTL() {
-    const tl = state.tl, body = $('tlBody');
-    if (!body) return;
-    const tlSources = state.sources.filter((s) => s.id.startsWith('src:tl')).sort((a, b) => b.loadedAt.localeCompare(a.loadedAt));
-    const src = tlSources[0];
-    $('tlStatus').textContent = src
-      ? `${src.name} · ${src.events} events · imported ${new Date(src.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${tlSources.length > 1 ? ` · ${tlSources.length} weeks loaded` : ''}`
-      : tl.url ? 'Linked. Not imported yet.' : 'Not linked yet.';
-    const help = `<details><summary>How do I get a copy to import?</summary><ol>
-        <li>Open the TL Sheet.</li>
-        <li>In Excel for the web: <b>File → Create a Copy → Download a Copy</b>.</li>
-        <li>Click <b>Import copy</b> here and pick the downloaded .xlsx.</li></ol>
-        <p>Or, if the SharePoint folder is synced to File Explorer, pick the workbook straight from there.</p></details>`;
-    if (!tl.url || tl.editing) {
-      body.innerHTML = `<div class="stack">
-        <label class="field">Paste the SharePoint link
-          <div class="row"><input type="text" id="tlUrl" placeholder="https://….sharepoint.com/…" value="${esc(tl.url)}"><button class="btn primary sm" type="button" id="tlSave">Save</button></div>
-        </label>
-        <p class="muted small">…or <button class="linkbtn" type="button" id="tlPickShortcut">choose the TL Sheet shortcut file</button>.</p>
-        ${tl.url ? '<button class="linkbtn" type="button" id="tlCancel">Cancel</button>' : '<button class="btn" type="button" id="tlImport">Import copy</button>'}
-        ${tl.url ? '' : help}
-      </div>`;
-    } else {
-      let host = ''; try { host = new URL(tl.url).hostname; } catch (_) {}
-      body.innerHTML = `<div class="stack">
-        <a class="btn primary" href="${esc(tl.url)}" target="_blank" rel="noopener noreferrer">Open TL Sheet ↗</a>
-        <button class="btn" type="button" id="tlImport">Import copy</button>
-        <div class="host">${esc(host)} · <button class="linkbtn" type="button" id="tlEdit">change link</button></div>
-        ${help}
-      </div>`;
-    }
-  }
-
-  function wireTL() {
-    $('tlBody').addEventListener('click', (e) => {
-      const id = e.target.id;
-      if (id === 'tlSave') { setTLLink($('tlUrl').value); }
-      else if (id === 'tlCancel') { state.tl.editing = false; renderTL(); }
-      else if (id === 'tlEdit') { state.tl.editing = true; renderTL(); }
-      else if (id === 'tlPickShortcut' || id === 'tlImport') { $('tlFileInput').value = ''; $('tlFileInput').click(); }
-    });
-    $('tlBody').addEventListener('keydown', (e) => { if (e.target.id === 'tlUrl' && e.key === 'Enter') { e.preventDefault(); $('tlSave').click(); } });
-    $('tlFileInput').onchange = async (e) => {
-      const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, buf: await f.arrayBuffer() })));
-      if (files.length) handleFiles(files, { tl: true });
-    };
-  }
-
   /* ---------- Sample data ---------- */
   function loadSample() {
     const t = todayISO();
@@ -449,5 +445,5 @@
     setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; render(); } }, 60000);
   }
 
-  load(); wire(); wireTL(); render();
+  load(); wire(); render();
 })();

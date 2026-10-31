@@ -17,6 +17,7 @@ Supported files:
 | Type | What it's used for |
 | --- | --- |
 | `.xlsx` / `.xls` / `.csv` | Function sheets / event lists, or rosters |
+| `.pdf` | BEOs (Delphi event orders) |
 | `.ics` | Calendar exports (Outlook / Google Calendar) |
 | `.json` | `{ "events": [...], "shifts": [...] }` |
 
@@ -32,23 +33,33 @@ Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
-### TL Sheet (SharePoint)
+### TL Sheet → bar team roster
 
-The **TL Sheet** card stores the SharePoint link. Paste it in, or choose the `.url` shortcut file. After that, **Open TL Sheet ↗** opens it in one click. To get its data into the dashboard, download a copy (Excel for the web: *File → Create a Copy → Download a Copy*) or pick the workbook from a synced SharePoint folder, then click **Import copy**. The main *Load documents* button recognises TL workbooks too.
+Download the week's TL workbook (Excel for the web: *File → Create a Copy → Download a Copy*) and load it with **Load documents**. It's recognised automatically (`js/tl.js`):
 
-How a TL workbook is read (`js/tl.js`):
-
-- Only the **bar tabs** are read: `MON-BAR`, `FRI-BAR (1)` and so on. GB, Studio, Set Up, Off charges and other tabs are ignored.
+- Only the **bar tabs** are read: `MON-BAR`, `FRI-BAR (1)` and so on. Every other tab is ignored.
 - The **date** comes from the top-right cell (e.g. "Monday, October 26, 2026"). If that cell is empty, it uses the day in the tab name plus the week in the file name (`TL 26.10.2026-1.11.2026`).
 - The **manager** comes from the MANAGER cell.
-- Each staff row gives **Name**, **Start**, **Bar** and **Duties**. Duties is the event they're working. A row with a Bar but no Duties joins the event already running at that bar. `YOLMO, Momo` is shown as `Momo Yolmo`.
-- Duties text on rows with no name becomes notes on the event. A note starting with a bar code (e.g. "AST - CLEAN & RESET FOR…") goes to that bar's event, and lines that follow are joined onto it.
+- Each staff row gives **Name**, **Start**, **Bar** and **Duties**. Duties is the event they're working. A row with blank Duties belongs to the same event as the row above (or the last event at that bar).
+- Duties text on rows with no name becomes notes, attached by bar code ("AST - CLEAN & RESET FOR…").
 - Staff whose Start says `REJ` or `Cancelled` are left out, and the review window lists them.
-- Reading stops at the "Bar Hrs:" / "CLOSING DUTIES" footer.
+- Every staff member becomes a **shift on the calendar**.
 
-Each week's workbook is kept separately. Re-importing the same week (including a re-download named `… (1).xlsx`) replaces that week only.
+Each week is stored separately. Re-importing the same week (including a re-download named `… (1).xlsx`) replaces that week only.
 
-Reading SharePoint live would need a Microsoft 365 app registration approved by IT. It's a possible later step.
+### BEOs → events
+
+Load BEO PDFs (Delphi "Event Order") the same way (`js/beo.js`). Each BEO becomes an event titled with its **Booking Name**, showing:
+
+- BEO name and number, and the Event Manager
+- the main venue and guaranteed numbers
+- the guest-facing time span (client access, crew catering and bump in/out are left out of the span)
+- the full function table
+- the **Beverage** section, with packages, prices and beverage notes
+
+A revised BEO with the same BEO# replaces the earlier version.
+
+**Matching:** on each day, bar staff from the TL sheet are attached to the BEO whose Booking Name matches their **Duties** text. The match ignores capitals, punctuation and "&"/"and", and allows small differences. A TL duty with no matching BEO still shows, tagged *TL only · no matching BEO*, so a name mismatch is easy to spot.
 
 ### Native Google Sheets
 
@@ -76,8 +87,10 @@ index.html        page layout
 styles.css        styling (light + dark mode)
 js/parse.js       reads spreadsheets / CSV / ICS and guesses columns
 js/app.js         dashboard, calendar, import review, storage
+js/tl.js          TL workbook reader (bar tabs → shifts)
+js/beo.js         BEO PDF reader (→ events)
 js/drive.js       optional Google Drive picker
 config.js         optional Google credentials
-vendor/           SheetJS (xlsx) library, Apache-2.0
+vendor/           SheetJS (xlsx) and PDF.js libraries, Apache-2.0
 samples/          example files
 ```

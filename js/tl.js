@@ -100,14 +100,14 @@
     for (const s of staff) {
       if (s.status) continue;
       let duty = s.duty || (s.bar && lastDutyAtBar[s.bar]) || '';
-      if (!duty && !s.bar) duty = lastDuty;
+      if (!duty) duty = lastDuty;      // blank Duties = same event as the row above
       if (!duty) duty = s.bar ? `${s.bar} bar` : 'Bar shift';
       if (s.bar) lastDutyAtBar[s.bar] = duty;
       lastDuty = duty;
       const key = duty.toLowerCase();
       let ev = byKey.get(key);
       if (!ev) {
-        ev = { date, title: duty, start: null, end: null, venue: '', bars: [], pax: '', notes: '', staff: [], staffDetail: [], manager, team: 'Bars', sheet: sheetName };
+        ev = { date, title: duty, start: null, end: null, venue: '', bars: [], pax: '', notes: '', staff: [], staffDetail: [], manager, team: 'Bars', sheet: sheetName, fromTL: true };
         byKey.set(key, ev); events.push(ev);
       }
       if (s.bar && !ev.bars.includes(s.bar)) ev.bars.push(s.bar);
@@ -137,9 +137,10 @@
       events[0].notes = [events[0].notes, ...dayNotes].filter(Boolean).join(' · ');
     }
 
-    const shifts = staff.filter((s) => !s.status).map((s) => ({
-      date, person: s.name, start: s.start, end: null, label: '', role: s.bar ? `Bar · ${s.bar}` : 'Bar', venue: s.bar,
-    }));
+    const shifts = [];
+    events.forEach((e) => e.staffDetail.forEach((d) => shifts.push({
+      date, person: d.name, start: d.start, end: null, label: '', role: d.bar ? `Bar · ${d.bar}` : 'Bar', venue: d.bar, duty: e.title,
+    })));
     const out = staff.filter((s) => s.status);
     if (out.length) warnings.push(`${sheetName}: skipped ${out.map((s) => `${s.name} (${s.status})`).join(', ')}.`);
     if (!events.length) warnings.push(`${sheetName}: no bar staff listed.`);
