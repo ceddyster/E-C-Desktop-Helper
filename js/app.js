@@ -54,37 +54,42 @@
   /* BEOs are the events. The TL sheet's Duties column names the event each bar team works,
    * so TL groups are attached to the BEO with the same name on the same day. TL duties with
    * no matching BEO still show, flagged, so a name mismatch is easy to spot. */
-  const STOP = new Set(['the', 'of', 'and', 'for', 'a', 'an', 'at', 'in', 'on', 'to']);
-  const normName = (s) => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-  function namesMatch(x, y) {
-    const a = normName(x), b = normName(y);
-    if (!a || !b) return false;
-    if (a === b) return true;
-    if (Math.min(a.length, b.length) >= 6 && (a.includes(b) || b.includes(a))) return true;
-    const ta = new Set(a.split(' ').filter((w) => !STOP.has(w))), tb = new Set(b.split(' ').filter((w) => !STOP.has(w)));
-    const shared = [...ta].filter((w) => tb.has(w)).length;
-    return shared >= 2 && shared / Math.min(ta.size, tb.size) >= 0.75;
-  }
-  function beoMatches(beo, duty) {
-    return namesMatch(duty, beo.title) || (beo.subtitle && namesMatch(duty, `${beo.title} ${beo.subtitle}`))
-      || (beo.beo && beo.beo.account && namesMatch(duty, beo.beo.account));
-  }
+  const M = window.CrownMatch;
+  // Manual corrections: "date|duty" → BEO source id, or 'none' to keep the TL duty separate.
+  const linkKey = (date, duty) => `${date}|${M.key(duty)}`;
   function dayEvents(iso) {
     const all = state.events.filter((e) => e.date === iso);
-    const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [] }));
+    const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [], tlDuties: [] }));
+    const beos = main.filter((b) => b.beo);
     const out = [...main];
     for (const t of all.filter((e) => e.fromTL)) {
-      const m = main.find((b) => b.beo && beoMatches(b, t.title));
+      const manual = (state.links || {})[linkKey(iso, t.title)];
+      const m = manual ? (manual === 'none' ? null : beos.find((b) => b.id === manual) || null)
+        : M.best(t.title, t.bars, beos);
       if (m) {
         m.barStaff.push(...(t.staffDetail || []));
         m.bars = [...new Set([...m.bars, ...(t.bars || [])])];
         if (t.notes) m.barNotes.push(t.notes);
         m.manager = m.manager || t.manager;
+        m.tlDuties.push({ duty: t.title, manual: !!manual });
       } else {
-        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], noBEO: true }));
+        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], noBEO: true, beoChoices: beos.length, manualNone: manual === 'none' }));
       }
     }
     return out.sort(byTime);
+  }
+  function setLink(date, duty, value) {
+    state.links = state.links || {};
+    if (value === '') delete state.links[linkKey(date, duty)]; else state.links[linkKey(date, duty)] = value;
+    save(); render();
+  }
+  function linkPicker(date, duty, current) {
+    const beos = state.events.filter((e) => e.date === date && e.beo);
+    return `<select class="link-pick" data-link-date="${esc(date)}" data-link-duty="${esc(duty)}" aria-label="Which BEO is ${esc(duty)}?">
+      <option value="">Automatic</option>
+      ${beos.map((b) => `<option value="${esc(b.id)}" ${current === b.id ? 'selected' : ''}>${esc(b.title)}${b.subtitle ? ' · ' + esc(b.subtitle) : ''}</option>`).join('')}
+      <option value="none" ${current === 'none' ? 'selected' : ''}>Not on a BEO (keep separate)</option>
+    </select>`;
   }
   function eventsOn(iso) { return dayEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e)); }
   function shiftsOn(iso) { return state.shifts.filter((s) => s.date === iso).sort(byTime); }
@@ -154,7 +159,9 @@
     return `<li class="${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
       <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
       <div>
-        <div class="event-title">${esc(e.title)}${e.noBEO ? ' <span class="tag">TL only · no matching BEO</span>' : ''}</div>
+        <div class="event-title">${esc(e.title)}${e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
+        ${e.noBEO && e.beoChoices ? `<div class="event-meta">Is this one of today's BEOs? ${linkPicker(e.date, e.title, e.manualNone ? 'none' : '')}</div>` : ''}
+        ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
         ${sub ? `<div class="event-meta">${sub}</div>` : ''}
         ${meta ? `<div class="event-meta">${meta}</div>` : ''}
         ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
@@ -620,6 +627,23 @@
       render();
     };
 
+    // Manual BEO ↔ TL links.
+    document.addEventListener('change', (e) => {
+      const sel = e.target.closest('.link-pick'); if (!sel) return;
+      setLink(sel.dataset.linkDate, sel.dataset.linkDuty, sel.value);
+      toast(sel.value === '' ? 'Back to automatic matching.' : sel.value === 'none' ? 'Kept separate.' : 'Linked. Bar staff now show on that BEO.');
+    });
+    document.addEventListener('click', (e) => {
+      const ch = e.target.closest('[data-change-link]');
+      if (ch) {
+        e.stopPropagation();
+        const cur = (state.links || {})[linkKey(ch.dataset.linkDate, ch.dataset.changeLink)] || '';
+        const span = document.createElement('span');
+        span.innerHTML = linkPicker(ch.dataset.linkDate, ch.dataset.changeLink, cur);
+        ch.replaceWith(span);
+        span.querySelector('select').focus();
+      }
+    }, true);
     document.addEventListener('click', (e) => {
       const d = e.target.closest('[data-date]'); if (d) { selectDate(d.dataset.date); if (d.closest('#upcomingList')) $('dailyTitle').scrollIntoView({ behavior: 'smooth' }); }
       if (e.target.closest('[data-act="load"]')) pickLocal();

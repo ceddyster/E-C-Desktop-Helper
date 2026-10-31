@@ -73,7 +73,15 @@ Load BEO PDFs (Delphi "Event Order") the same way (`js/beo.js`). Each BEO become
 
 A revised BEO with the same BEO# replaces the earlier version.
 
-**Matching:** on each day, bar staff from the TL sheet are attached to the BEO whose Booking Name matches their **Duties** text. The match ignores capitals, punctuation and "&"/"and", and allows small differences. A TL duty with no matching BEO still shows, tagged *TL only · no matching BEO*, so a name mismatch is easy to spot.
+**Matching:** on each day, bar staff from the TL sheet are attached to the BEO whose name best matches their **Duties** text (`js/match.js`). Small differences are allowed:
+
+- Capitals, punctuation, "&"/"and" and possessives are ignored: *Phill's* reads as *Phill*.
+- Small typos and short forms are accepted: *Phil* ↔ *Phill*, *Vic* ↔ *Victoria*.
+- Extra words are fine: *REBECCA & PHIL WEDDING* matches *Rebecca & Phill's Wedding Reception*, and *PGA GALA DINNER* matches *(Inc) PGA Conference & Gala Dinner*.
+- At least one name word must match, so two weddings on the same day aren't mixed up.
+- The bar code is a tie-breaker: *AST3* ↔ *Astral 3*, *CB3* ↔ *Crown Ballroom 3*.
+
+A TL duty with no matching BEO still shows, tagged *TL only · no matching BEO*, with a picker to link it to one of that day's BEOs by hand. Matched events show which TL duty they came from, with a **change** link to correct or undo a match. Manual choices are remembered.
 
 ### Native Google Sheets
 
@@ -103,6 +111,7 @@ js/parse.js       reads spreadsheets / CSV / ICS and guesses columns
 js/app.js         dashboard, calendar, import review, storage
 js/tl.js          TL workbook reader (bar tabs → shifts)
 js/beo.js         BEO PDF reader (→ events)
+js/match.js       TL duty ↔ BEO name matching
 js/folder.js      linked-folder access (File System Access API)
 js/drive.js       optional Google Drive picker
 config.js         optional Google credentials
