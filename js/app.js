@@ -118,8 +118,10 @@
     $('todayLabel').textContent = fmtLong(todayISO());
     $('sourceCount').textContent = state.sources.length;
     $('onlyMine').checked = view.onlyMine;
-    renderTodayWin(); renderCalWin();
-    renderDaily(); renderCalendar(); renderUpcoming();
+    // Each part draws on its own, so a problem in one can't blank the whole page.
+    for (const part of [renderTodayWin, renderCalWin, renderDaily, renderCalendar, renderUpcoming]) {
+      try { part(); } catch (e) { console.error(e); if (window.__crownShowError) window.__crownShowError(`${e.message} (${part.name})`); }
+    }
   }
 
   function emptyState(msg, withButton) {

@@ -271,3 +271,6 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 }
 .day .wk-dow { display: none; }
 @media (max-width: 700px) { .cal-grid.week .day .wk-dow { display: inline; font-size: .75rem; color: var(--muted); margin-left: 4px; } .cal-grid.week .day { flex-direction: row; flex-wrap: wrap; align-items: center; } }
+
+.err-banner { position: sticky; top: 0; z-index: 50; background: #b3261e; color: #fff; padding: 12px 24px; font-size: .92rem; }
+.err-banner small { opacity: .85; word-break: break-all; }

@@ -27,8 +27,8 @@
     if (!loading) {
       // The worker script is also loaded on the page so PDFs still open from a local file (file://),
       // where browsers block background workers.
-      loading = loadScript('vendor/pdfjs/pdf.min.js')
-        .then(() => loadScript('vendor/pdfjs/pdf.worker.min.js'))
+      loading = loadScript('vendor/pdfjs/pdf.min.js?v=3.11.174')
+        .then(() => loadScript('vendor/pdfjs/pdf.worker.min.js?v=3.11.174'))
         .then(() => {
           global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
           return global.pdfjsLib;
