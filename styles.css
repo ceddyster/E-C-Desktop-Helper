@@ -290,3 +290,10 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .win-setup .win-ev span:first-child { font-weight: 500; color: var(--muted); font-size: .88rem; }
 .win-setup .win-staff { font-size: .82rem; color: var(--muted); }
 .win-setup-line { color: var(--muted); font-size: .85rem; }
+
+/* Unfilled spot in the On shift list: a highlighted blank name, like the TL sheet */
+.shift-list li.gap-row { background: #fff59d; color: #1c1a17; border-radius: 6px; padding: 8px 8px; border-bottom: 0; margin: 4px 0; }
+.shift-list li.gap-row .muted { color: #5b5544; }
+.shift-list li.gap-row .when { color: #1c1a17; font-weight: 600; }
+.blank-name { font-weight: 700; color: var(--danger); }
+.blank-name::before { content: "⚠ "; }

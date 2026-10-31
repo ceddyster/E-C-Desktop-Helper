@@ -59,7 +59,7 @@ Download the week's TL workbook (Excel for the web: *File → Create a Copy → 
 - The **manager** comes from the MANAGER cell.
 - **Bold Duties text is an event name.** Everyone listed below it, up to the next bold entry, works that event. The **Bar** column cross-checks this: a person whose bar belongs to an earlier event joins that one, and a bar with no event (e.g. `SET UP`) becomes its own team. Bold is read straight from the workbook's formatting (`js/xlsxfmt.js`). If formatting can't be read, event names are guessed and the review window says so.
 - **Non-bold Duties text is the team's after-event jobs** ("GB1 - CLEAN & RESET FOR LGPA COCKTAIL"). Lines on consecutive rows are joined into one job. A job starting with a bar code goes to that bar's event; otherwise it goes to the event it sits under. Jobs show under **After the event** on the event.
-- **A row with a start time but no name** (the highlighted blanks) is an **unfilled spot**. Events show "⚠ 3 staff still needed (4:15pm CB)", and the calendar shows a red "⚠ 3 missing" on that day.
+- **A row with a start time but no name** (the highlighted blanks) is an **unfilled spot**. Events show "⚠ 3 staff still needed (4:15pm CB)", the **On shift** list shows each one as a yellow **⚠ Unfilled** row (bar, event, start time), and the calendar shows a red "⚠ 3 missing" on that day.
 - Staff whose Start says `REJ` or `Cancelled` are left out, and the review window lists them.
 - Every staff member becomes a **shift on the calendar**.
 

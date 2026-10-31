@@ -167,7 +167,7 @@
       const starts = b.staffDetail.map((d) => d.start).concat(b.missing.map((m) => m.start)).filter(Boolean).sort();
       return {
         date, title: b.title, start: starts[0] || null, end: null, venue: b.bars.join(' / '), bars: b.bars, pax: '',
-        notes: '', tasks: b.tasks, missing: b.missing, kind: b.kind,
+        notes: '', tasks: b.tasks, missing: b.missing.map((m) => Object.assign({ duty: b.title }, m)), kind: b.kind,
         staff: b.staffDetail.map((d) => d.name), staffDetail: b.staffDetail,
         manager, team: 'Bars', sheet: sheetName, fromTL: true,
       };

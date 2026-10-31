@@ -163,8 +163,14 @@
     const evs = eventsOn(iso);
     $('dailyEvents').innerHTML = evs.length ? evs.map(eventCard).join('') : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
 
-    const sh = shiftsOn(iso);
-    $('dailyShifts').innerHTML = sh.length ? sh.map((s) => `<li class="${isMe(s.person) ? 'mine' : ''}">
+    // Rostered people plus one highlighted blank row per unfilled TL spot, in start-time order.
+    const gaps = dayEvents(iso).flatMap((e) => (e.missing || []).map((m) => ({ gap: true, start: m.start, bar: m.bar, duty: m.duty || e.title })));
+    const sh = [...shiftsOn(iso), ...gaps].sort((a, b) => (a.start || '99').localeCompare(b.start || '99') || (a.gap ? 1 : 0) - (b.gap ? 1 : 0));
+    $('dailyShifts').innerHTML = sh.length ? sh.map((s) => s.gap
+      ? `<li class="gap-row">
+        <span class="who"><span class="blank-name">Unfilled</span>${s.bar ? ` <span class="muted small">Bar · ${esc(s.bar)}</span>` : ''}<br><span class="muted small">${esc(s.duty)}</span></span>
+        <span class="when">${s.start ? fmtTime(s.start) : ''}</span></li>`
+      : `<li class="${isMe(s.person) ? 'mine' : ''}">
         <span class="who">${esc(s.person)}${s.role ? ` <span class="muted small">${esc(s.role)}</span>` : ''}${s.duty ? `<br><span class="muted small">${esc(s.duty)}</span>` : ''}</span>
         <span class="when">${s.start ? `${fmtTime(s.start)}${s.end ? '–' + fmtTime(s.end) : ''}` : esc(s.label)}</span></li>`).join('')
       : emptyState(state.shifts.length ? 'Nobody rostered.' : 'Load a roster to see who\'s on.');
@@ -490,7 +496,7 @@
 
   /** Imports TL Sheets / BEOs that are new or changed since the last check. */
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 4;
+  const READER_VERSION = 5;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let scanProgress = '';
 
