@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-10-31j">
+  <link rel="stylesheet" href="styles.css?v=2026-10-31k">
 </head>
 <body>
   <header class="topbar">
@@ -157,6 +157,16 @@
         <input type="text" id="myName" placeholder="e.g. Cedric">
       </label>
       <p class="muted small">Events and shifts that mention this name get highlighted and count as "mine".</p>
+      <label class="field">Keep past events and shifts for
+        <select id="keepMonths">
+          <option value="1">1 month</option>
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="12">12 months</option>
+          <option value="0">Forever</option>
+        </select>
+      </label>
+      <p class="muted small">Older ones are cleared from the dashboard automatically to save space. Your files and folders are never touched.</p>
       <div class="dlg-foot">
         <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
       </div>
@@ -184,15 +194,15 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-10-31j"></script>
-  <script src="config.js?v=2026-10-31j"></script>
-  <script src="js/parse.js?v=2026-10-31j"></script>
-  <script src="js/xlsxfmt.js?v=2026-10-31j"></script>
-  <script src="js/tl.js?v=2026-10-31j"></script>
-  <script src="js/beo.js?v=2026-10-31j"></script>
-  <script src="js/folder.js?v=2026-10-31j"></script>
-  <script src="js/match.js?v=2026-10-31j"></script>
-  <script src="js/drive.js?v=2026-10-31j"></script>
-  <script src="js/app.js?v=2026-10-31j"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-10-31k"></script>
+  <script src="config.js?v=2026-10-31k"></script>
+  <script src="js/parse.js?v=2026-10-31k"></script>
+  <script src="js/xlsxfmt.js?v=2026-10-31k"></script>
+  <script src="js/tl.js?v=2026-10-31k"></script>
+  <script src="js/beo.js?v=2026-10-31k"></script>
+  <script src="js/folder.js?v=2026-10-31k"></script>
+  <script src="js/match.js?v=2026-10-31k"></script>
+  <script src="js/drive.js?v=2026-10-31k"></script>
+  <script src="js/app.js?v=2026-10-31k"></script>
 </body>
 </html>

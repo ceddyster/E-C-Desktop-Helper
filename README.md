@@ -33,6 +33,8 @@ Dates are read day-first (Australian format). If you load a file with the same n
 
 Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 
+**Old data is cleared automatically.** Events and shifts dated more than **3 months** ago are removed from the dashboard's saved data. This happens when it opens, after each import, and at midnight, and keeps browser storage small. Change the period, or choose *Forever*, in **⚙︎ Settings**. Only the dashboard's own copy is cleared: TL Sheets, BEO PDFs and linked folders are never touched, and an old file isn't re-imported just because its events were cleared. To bring old events back, set a longer period and use **Re-read all** on the folder.
+
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
 ### Linked folders (automatic)

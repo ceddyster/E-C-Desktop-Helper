@@ -6,7 +6,7 @@
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   /* ---------- State ---------- */
-  let state = { sources: [], events: [], shifts: [], myName: '' };
+  let state = { sources: [], events: [], shifts: [], myName: '', keepMonths: 3 };
   const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), weekStart: null, onlyMine: false, calMode: 'shifts', calRange: 'week' };
 
   function load() {
@@ -16,6 +16,35 @@
     try { view.calMode = localStorage.getItem(STORE + '.calMode') || 'shifts'; } catch (_) {}
     try { view.calRange = localStorage.getItem(STORE + '.calRange') || 'week'; } catch (_) {}
     view.weekStart = mondayOf(new Date());
+    if (state.keepMonths == null) state.keepMonths = 3;
+    if (pruneOld()) save();
+  }
+
+  /* Housekeeping: drop events and shifts dated more than `keepMonths` ago from the dashboard's own
+   * storage (this browser only). Files and linked folders are never touched, and a file that's already
+   * been read isn't read again just because its old events were cleared. Returns how many were removed. */
+  function pruneOld() {
+    const months = +state.keepMonths;
+    if (!months) return 0;
+    const now = new Date();
+    const cutoff = P.isoOf(new Date(now.getFullYear(), now.getMonth() - months, now.getDate()));
+    const before = state.events.length + state.shifts.length;
+    const had = new Set([...state.events, ...state.shifts].map((x) => x.source));
+    state.events = state.events.filter((e) => !e.date || e.date >= cutoff);
+    state.shifts = state.shifts.filter((x) => !x.date || x.date >= cutoff);
+    const removed = before - state.events.length - state.shifts.length;
+    if (!removed) return 0;
+    // Update document counts; forget documents whose events have all been cleared.
+    const count = {};
+    for (const x of [...state.events, ...state.shifts]) count[x.source] = (count[x.source] || 0) + 1;
+    state.sources = state.sources.filter((src) => !had.has(src.id) || count[src.id]);
+    for (const src of state.sources) {
+      src.events = state.events.filter((e) => e.source === src.id).length;
+      src.shifts = state.shifts.filter((x) => x.source === src.id).length;
+    }
+    // Manual BEO links for those days aren't needed any more either.
+    for (const k of Object.keys(state.links || {})) if (k.slice(0, 10) < cutoff) delete state.links[k];
+    return removed;
   }
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { toast('Could not save to this browser — data will reset on reload.'); }
@@ -467,7 +496,8 @@
       ne += events.length; ns += shifts.length;
       events.concat(shifts).forEach((x) => x.date && dates.push(x.date));
     }
-    if (!quiet) toast(`Imported ${ne} events and ${ns} shifts.`);
+    const cleared = pruneOld();
+    if (!quiet) toast(`Imported ${ne} events and ${ns} shifts.${cleared ? ` ${cleared} older than ${state.keepMonths} month${+state.keepMonths === 1 ? '' : 's'} not kept.` : ''}`);
     return dates.sort();
   }
 
@@ -779,8 +809,14 @@
     };
     $('btnSample').onclick = loadSample;
 
-    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('settingsDlg').showModal(); };
-    $('btnSaveSettings').onclick = () => { state.myName = $('myName').value.trim(); save(); render(); };
+    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('settingsDlg').showModal(); };
+    $('btnSaveSettings').onclick = () => {
+      state.myName = $('myName').value.trim();
+      state.keepMonths = +$('keepMonths').value;
+      const cleared = pruneOld();
+      save(); render();
+      if (cleared) toast(`Cleared ${cleared} events and shifts older than ${state.keepMonths} month${state.keepMonths === 1 ? '' : 's'}. Your files weren't touched.`);
+    };
 
     $('dayPrev').onclick = () => selectDate(addDays(view.selected, -1));
     $('dayNext').onclick = () => selectDate(addDays(view.selected, 1));
@@ -855,7 +891,7 @@
 
     // Roll over to the new day if the page is left open overnight.
     let lastDay = todayISO();
-    setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; render(); } }, 60000);
+    setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; if (pruneOld()) save(); render(); } }, 60000);
   }
 
   load(); wire(); render(); initFolder();
