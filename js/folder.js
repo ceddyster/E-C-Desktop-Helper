@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
   const DB = 'crownDash', STORE = 'handles', KEY = 'folder';
-  const WANT = /\.(xlsx|xlsm|xlsb|xls|pdf|ics)$/i;
+  const WANT = /\.(xlsx|xlsm|xlsb|xls|pdf|ics|url)$/i;
   const MAX_DEPTH = 6;
 
   function idb() {
@@ -54,7 +54,9 @@
       } else if (WANT.test(name)) {
         try {
           const file = await entry.getFile();
-          out.push({ path: prefix + name, name, lastModified: file.lastModified, file });
+          const item = { path: prefix + name, name, lastModified: file.lastModified, file };
+          if (/\.url$/i.test(name)) item.target = shortcutTarget(await file.text());
+          out.push(item);
         } catch (e) {
           // Usually a cloud-only file OneDrive couldn't fetch right now. Reported, and tried again next check.
           out.push({ path: prefix + name, name, error: e.message || String(e) });
@@ -64,5 +66,21 @@
     return out;
   }
 
-  global.CrownFolder = { supported, pick, remember, saved, forget, permission, list };
+  /** Windows internet shortcut → its web address. */
+  function shortcutTarget(text) {
+    const m = String(text).match(/^URL=(\S+)/mi);
+    return m ? m[1].trim() : '';
+  }
+
+  /** "https://x.sharepoint.com/sites/Team/_layouts/…" → "https://x.sharepoint.com/sites/Team" */
+  function sharePointSite(url) {
+    try {
+      const u = new URL(url);
+      if (!/\.sharepoint\.com$/i.test(u.hostname)) return '';
+      const m = u.pathname.match(/\/(sites|teams)\/[^/]+/i);   // also inside "/:x:/r/sites/…" links
+      return u.origin + (m ? m[0] : '');
+    } catch (_) { return ''; }
+  }
+
+  global.CrownFolder = { shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list };
 })(window);

@@ -337,7 +337,7 @@
   async function readFile(name, buf) {
     const ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'pdf') return global.CrownBEO.readBEO(name, buf);
-    if (ext === 'url' || ext === 'website') throw new Error('That\'s a shortcut, not the workbook. Download the TL Sheet (File → Create a Copy → Download a Copy) and load the .xlsx.');
+    if (ext === 'url' || ext === 'website') throw new Error('that\'s a shortcut (.url), not the workbook, so it can\'t be read. Link the synced SharePoint folder instead (see Documents), or download a copy of the TL Sheet and load the .xlsx.');
     if (ext === 'ics') {
       const events = parseIcs(new TextDecoder().decode(buf));
       return [{ label: '', kind: 'ready', ready: { events, shifts: [], warnings: events.length ? [] : ['No events found in this calendar file.'] } }];

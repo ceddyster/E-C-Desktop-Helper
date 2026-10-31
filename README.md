@@ -43,6 +43,8 @@ Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are sa
 
 **SharePoint:** open the document library in the browser and click **Sync** (or **Add shortcut to My files**). It then appears in File Explorer under *OneDrive - Crown Resorts*. Link that folder.
 
+**Shortcuts (.url) don't work.** A folder of `.url` shortcuts only holds web addresses, and the browser can't open SharePoint files from them. The dashboard lists any shortcuts it finds under **Documents** and links to the SharePoint site they point to. Sync that site's library and link the synced folder instead.
+
 This needs Microsoft Edge or Google Chrome. The browser may ask for permission again after it restarts: click **📁 Reconnect** in the header, or choose "Allow on every visit" when it asks.
 
 ### TL Sheet → bar team roster

@@ -406,6 +406,10 @@
       const cutoff = Date.now() - FIRST_SCAN_DAYS * 864e5;
       const todo = [];
       for (const f of files) {
+        if (f.target !== undefined) {
+          st.files[f.path] = { status: 'shortcut', detail: f.target, site: F.sharePointSite(f.target) };
+          continue;
+        }
         if (f.error) { st.files[f.path] = { status: 'error', detail: `couldn't open (${f.error}). If it shows a cloud icon in File Explorer, right-click → Always keep on this device.` }; continue; }
         if (st.seen[f.path] === f.lastModified) continue;
         // Spreadsheets (TL Sheets) are always read. PDFs untouched for 60+ days are left out to keep things quick.
@@ -443,7 +447,9 @@
       st.found = files.length;
       st.name = folderName();
       save(); render();
-      if (loadedNow) toast(`📁 ${loadedNow} new or updated document${loadedNow === 1 ? '' : 's'} loaded from ${folderName()}.`);
+      const shortcuts = Object.values(st.files).filter((v) => v.status === 'shortcut').length;
+      if (!loadedNow && shortcuts) toast(`📁 This folder holds ${shortcuts} shortcut${shortcuts === 1 ? '' : 's'} (.url), not the files. Open Documents to see how to fix it.`);
+      else if (loadedNow) toast(`📁 ${loadedNow} new or updated document${loadedNow === 1 ? '' : 's'} loaded from ${folderName()}.`);
       else if (verbose) toast(files.length ? `📁 ${folderName()} checked. Nothing new. See Documents for details.` : `📁 No spreadsheets or PDFs found in ${folderName()}.`);
     } catch (e) {
       if (e.name === 'NotAllowedError' || e.name === 'SecurityError') folderPerm = 'prompt';
@@ -481,19 +487,33 @@
     }
     const files = Object.entries((st && st.files) || {}).sort((a, b) => a[0].localeCompare(b[0]));
     const group = (k) => files.filter(([, v]) => v.status === k);
-    const LABEL = { loaded: 'Loaded', error: 'Couldn\'t read', skipped: 'Not a TL Sheet or BEO', old: 'Older PDFs not checked' };
-    const summary = ['loaded', 'error', 'skipped', 'old'].map((k) => [k, group(k)]).filter(([, g]) => g.length);
+    const LABEL = { loaded: 'Loaded', error: 'Couldn\'t read', skipped: 'Not a TL Sheet or BEO', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
+    const summary = ['loaded', 'error', 'shortcut', 'skipped', 'old'].map((k) => [k, group(k)]).filter(([, g]) => g.length);
+    // Shortcuts only hold a web address. Point at the SharePoint site(s) they lead to, so the real
+    // library can be synced to File Explorer and linked instead.
+    const sites = [...new Set(group('shortcut').map(([, v]) => v.site).filter(Boolean))];
+    const shortcutHelp = group('shortcut').length ? `<div class="shortcut-help">
+        <strong>This folder has shortcuts (.url), not the actual files.</strong>
+        <p>A shortcut only stores a web address, and the browser can't open SharePoint files from it. To link the real files:</p>
+        <ol>
+          <li>Open the SharePoint site the shortcuts point to${sites.length ? ':' : '.'}
+            ${sites.map((u) => `<br><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u.replace(/^https:\/\//, ''))} ↗</a>`).join('')}</li>
+          <li>Go to the document library or folder that holds the TL Sheets (e.g. <b>Documents</b>).</li>
+          <li>Click <b>Sync</b>, or <b>Add shortcut to My files</b>. It then appears in File Explorer under <i>Crown Resorts</i> or <i>OneDrive - Crown Resorts</i>.</li>
+          <li>Back here, click <b>Change folder</b> and choose that synced folder.</li>
+        </ol></div>` : '';
     panel.innerHTML = `<div class="folder-box"><strong>📁 ${esc(folderName())}</strong>
       <p class="muted small">${folderPerm === 'granted'
-        ? (scanning ? `Checking files ${scanProgress}…` : `Checked ${st && st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st && st.found != null ? ` · ${st.found} spreadsheets/PDFs found` : ''} · rechecks every few minutes while open.`)
+        ? (scanning ? `Checking files ${scanProgress}…` : `Checked ${st && st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st && st.found != null ? ` · ${st.found} files found` : ''} · rechecks every few minutes while open.`)
         : 'The browser needs your OK again before it can read this folder.'}</p>
       <div class="row">
         ${folderPerm === 'granted' ? '<button class="btn primary sm" type="button" data-folder="scan">Check now</button><button class="btn sm" type="button" data-folder="reread">Re-read all</button>' : '<button class="btn primary sm" type="button" data-folder="reconnect">Reconnect</button>'}
         <button class="btn sm" type="button" data-folder="link">Change folder</button>
         <button class="btn sm danger" type="button" data-folder="unlink">Unlink</button>
       </div>
+      ${shortcutHelp}
       ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
-        `<li><b>${esc(path)}</b>${v.detail ? ` · ${esc(v.detail)}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
+        `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
     </div>`;
   }
 
