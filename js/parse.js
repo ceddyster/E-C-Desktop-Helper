@@ -278,6 +278,8 @@
     // CSVs are read as plain text so "3/11/2026" stays day-first (SheetJS would read it as US m/d).
     const isText = /\.(csv|tsv|txt)$/i.test(name);
     const wb = global.XLSX.read(buf, isText ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
+    const tl = global.CrownTL && global.CrownTL.readTLWorkbook(wb, name);
+    if (tl) return [tl];
     return wb.SheetNames.map((sn) => {
       const rows = global.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '', blankrows: false });
       return analyseRows(rows, wb.SheetNames.length > 1 ? sn : '', name);

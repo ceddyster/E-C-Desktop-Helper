@@ -34,7 +34,19 @@ Example files to try are in `samples/`. **Documents → Load sample data** fills
 
 ### TL Sheet (SharePoint)
 
-The **TL Sheet** card stores the SharePoint link. Paste it in, or choose the `.url` shortcut file. After that, **Open TL Sheet ↗** opens it in one click. To get its data into the dashboard, download a copy (Excel for the web: *File → Create a Copy → Download a Copy*) or pick the workbook from a synced SharePoint folder, then click **Import copy**. Each import replaces the previous TL Sheet data, whatever the download is called. If a sheet has no Date column, the date is taken from a title row (e.g. "TL Sheet - Tuesday 3 November"), the tab name or the file name.
+The **TL Sheet** card stores the SharePoint link. Paste it in, or choose the `.url` shortcut file. After that, **Open TL Sheet ↗** opens it in one click. To get its data into the dashboard, download a copy (Excel for the web: *File → Create a Copy → Download a Copy*) or pick the workbook from a synced SharePoint folder, then click **Import copy**. The main *Load documents* button recognises TL workbooks too.
+
+How a TL workbook is read (`js/tl.js`):
+
+- Only the **bar tabs** are read: `MON-BAR`, `FRI-BAR (1)` and so on. GB, Studio, Set Up, Off charges and other tabs are ignored.
+- The **date** comes from the top-right cell (e.g. "Monday, October 26, 2026"). If that cell is empty, it uses the day in the tab name plus the week in the file name (`TL 26.10.2026-1.11.2026`).
+- The **manager** comes from the MANAGER cell.
+- Each staff row gives **Name**, **Start**, **Bar** and **Duties**. Duties is the event they're working. A row with a Bar but no Duties joins the event already running at that bar. `YOLMO, Momo` is shown as `Momo Yolmo`.
+- Duties text on rows with no name becomes notes on the event. A note starting with a bar code (e.g. "AST - CLEAN & RESET FOR…") goes to that bar's event, and lines that follow are joined onto it.
+- Staff whose Start says `REJ` or `Cancelled` are left out, and the review window lists them.
+- Reading stops at the "Bar Hrs:" / "CLOSING DUTIES" footer.
+
+Each week's workbook is kept separately. Re-importing the same week (including a re-download named `… (1).xlsx`) replaces that week only.
 
 Reading SharePoint live would need a Microsoft 365 app registration approved by IT. It's a possible later step.
 

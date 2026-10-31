@@ -42,7 +42,7 @@
     const a = n.split(/\s+/), b = me.split(/\s+/);
     return (a.length === 1 || b.length === 1) && a[0] === b[0];
   }
-  const eventIsMine = (e) => (e.staff || []).some(isMe);
+  const eventIsMine = (e) => (e.staff || []).some(isMe) || isMe(e.manager);
 
   let toastTimer;
   function toast(msg) {
@@ -88,14 +88,17 @@
     const evs = eventsOn(iso);
     $('dailyEvents').innerHTML = evs.length ? evs.map((e) => {
       const staff = staffFor(e);
-      const meta = [e.venue, e.pax && `${e.pax} pax`].filter(Boolean).map(esc).join(' · ');
+      const meta = [e.venue && (e.team === 'Bars' ? `Bar: ${e.venue}` : e.venue), e.pax && `${e.pax} pax`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
+      const detail = e.staffDetail && e.staffDetail.length ? e.staffDetail : null;
       return `<li class="${eventIsMine(e) ? 'mine' : ''}">
         <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
         <div>
           <div class="event-title">${esc(e.title)}</div>
           ${meta ? `<div class="event-meta">${meta}</div>` : ''}
           ${e.notes ? `<div class="event-meta">${esc(e.notes)}</div>` : ''}
-          <div class="chips">${staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>'}</div>
+          <div class="chips">${detail
+            ? detail.map((d) => `<span class="chip ${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}${d.bar && e.bars && e.bars.length > 1 ? ` · ${esc(d.bar)}` : ''}</span>`).join('')
+            : staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>'}</div>
         </div></li>`;
     }).join('') : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
 
@@ -161,7 +164,11 @@
         const sheets = await P.readFile(f.name, f.buf);
         if (sheets[0] && sheets[0].kind === 'link') { setTLLink(sheets[0].url); continue; }
         // TL Sheet copies always replace the previous copy, whatever the download was called.
-        pending.push(opts.tl ? { fileName: f.name, sheets, sourceId: 'src:tl-sheet', displayName: `TL Sheet (${f.name})` } : { fileName: f.name, sheets });
+        if (sheets[0] && sheets[0].isTL) opts = Object.assign({}, opts, { tl: true });
+        // TL workbooks are weekly ("TL 26.10.2026-1.11.2026.xlsx"): one source per week, and a
+        // re-download of the same week ("… (1).xlsx") replaces it.
+        const week = f.name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)\s*$/, '').trim();
+        pending.push(opts.tl ? { fileName: f.name, sheets, sourceId: 'src:tl:' + week.toLowerCase(), displayName: week } : { fileName: f.name, sheets });
       } catch (e) { errors.push(`${f.name}: ${e.message}`); }
     }
     if (errors.length) toast(errors.join(' · '));
@@ -244,7 +251,6 @@
       events.forEach((e, i) => { e.id = `${id}#e${i}`; e.source = id; });
       shifts.forEach((s, i) => { s.id = `${id}#s${i}`; s.source = id; });
       state.events.push(...events); state.shifts.push(...shifts);
-      if (id === 'src:tl-sheet') state.tl.lastImport = new Date().toISOString();
       state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length });
       ne += events.length; ns += shifts.length;
     }
@@ -280,9 +286,10 @@
   function renderTL() {
     const tl = state.tl, body = $('tlBody');
     if (!body) return;
-    const src = state.sources.find((s) => s.id === 'src:tl-sheet');
+    const tlSources = state.sources.filter((s) => s.id.startsWith('src:tl')).sort((a, b) => b.loadedAt.localeCompare(a.loadedAt));
+    const src = tlSources[0];
     $('tlStatus').textContent = src
-      ? `Last imported ${new Date(src.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })} · ${src.events} events`
+      ? `${src.name} · ${src.events} events · imported ${new Date(src.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${tlSources.length > 1 ? ` · ${tlSources.length} weeks loaded` : ''}`
       : tl.url ? 'Linked. Not imported yet.' : 'Not linked yet.';
     const help = `<details><summary>How do I get a copy to import?</summary><ol>
         <li>Open the TL Sheet.</li>
@@ -295,7 +302,8 @@
           <div class="row"><input type="text" id="tlUrl" placeholder="https://….sharepoint.com/…" value="${esc(tl.url)}"><button class="btn primary sm" type="button" id="tlSave">Save</button></div>
         </label>
         <p class="muted small">…or <button class="linkbtn" type="button" id="tlPickShortcut">choose the TL Sheet shortcut file</button>.</p>
-        ${tl.url ? '<button class="linkbtn" type="button" id="tlCancel">Cancel</button>' : ''}
+        ${tl.url ? '<button class="linkbtn" type="button" id="tlCancel">Cancel</button>' : '<button class="btn" type="button" id="tlImport">Import copy</button>'}
+        ${tl.url ? '' : help}
       </div>`;
     } else {
       let host = ''; try { host = new URL(tl.url).hostname; } catch (_) {}

@@ -204,3 +204,4 @@ input[type="text"], select {
 .tl details ol { padding-left: 18px; margin: 6px 0 0; }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; font-size: .82rem; }
 a.btn { text-decoration: none; text-align: center; display: inline-block; }
+.chip b { font-weight: 600; color: var(--muted); margin-left: 2px; }
