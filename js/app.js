@@ -7,12 +7,13 @@
 
   /* ---------- State ---------- */
   let state = { sources: [], events: [], shifts: [], myName: '', tl: { url: '', lastImport: null } };
-  const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), onlyMine: false };
+  const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), onlyMine: false, calMode: 'shifts' };
 
   function load() {
     try { const s = JSON.parse(localStorage.getItem(STORE)); if (s) state = Object.assign(state, s); } catch (_) {}
     state.tl = Object.assign({ url: '', lastImport: null }, state.tl, { editing: false });
     try { view.onlyMine = localStorage.getItem(STORE + '.onlyMine') === '1'; } catch (_) {}
+    try { view.calMode = localStorage.getItem(STORE + '.calMode') || 'shifts'; } catch (_) {}
   }
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (_) { toast('Could not save to this browser — data will reset on reload.'); }
@@ -54,6 +55,10 @@
     return state.events.filter((e) => e.date === iso && (!view.onlyMine || eventIsMine(e))).sort(byTime);
   }
   function shiftsOn(iso) { return state.shifts.filter((s) => s.date === iso).sort(byTime); }
+  function calShiftsOn(iso) { return shiftsOn(iso).filter((s) => !view.onlyMine || isMe(s.person)); }
+  // "Leisly Tuesta Melendez" → "Leisly T." to fit calendar cells.
+  const shortName = (n) => { const p = String(n).trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[1][0]}.` : p[0]; };
+  const shiftWhen = (s) => (s.start ? fmtTime(s.start) + (s.end ? '–' + fmtTime(s.end) : '') : s.label || '');
   // Staff on an event: listed names, plus rostered people whose shift venue/label matches the event.
   function staffFor(e) {
     const names = new Set(e.staff || []);
@@ -120,19 +125,35 @@
       const iso = P.isoOf(d);
       if (i === 35 && d.getMonth() !== m.getMonth()) break; // drop empty 6th row
       const evs = eventsOn(iso);
+      const shs = calShiftsOn(iso);
       const myShift = shiftsOn(iso).find((s) => isMe(s.person));
+      const showShifts = view.calMode === 'shifts' && state.shifts.length;
+      const items = showShifts
+        ? shs.map((s) => `<span class="sh ${isMe(s.person) ? 'mine' : ''}" title="${esc(s.person)} · ${esc(shiftWhen(s))}${s.venue ? ' · ' + esc(s.venue) : ''}"><b>${esc(shiftWhen(s))}</b> ${esc(shortName(s.person))}${s.venue ? `<br><span class="muted">${esc(s.venue)}</span>` : ''}</span>`)
+        : evs.map((e) => `<span class="ev ${eventIsMine(e) ? 'mine' : ''}" title="${esc(e.title)}">${e.start ? fmtTime(e.start) + ' ' : ''}${esc(e.title)}</span>`);
       const cls = ['day', d.getMonth() !== m.getMonth() && 'other', iso === today && 'today', iso === view.selected && 'selected'].filter(Boolean).join(' ');
-      html += `<button type="button" class="${cls}" data-date="${iso}" aria-label="${fmtLong(iso)}, ${evs.length} events">
+      html += `<button type="button" class="${cls}" data-date="${iso}" aria-label="${fmtLong(iso)}, ${shs.length} shifts, ${evs.length} events">
         <span class="num">${d.getDate()}</span>
-        ${myShift ? `<span class="shiftdot">● On ${myShift.start ? fmtTime(myShift.start) : esc(myShift.label)}</span>` : ''}
-        ${evs.slice(0, 3).map((e) => `<span class="ev ${eventIsMine(e) ? 'mine' : ''}" title="${esc(e.title)}">${e.start ? fmtTime(e.start) + ' ' : ''}${esc(e.title)}</span>`).join('')}
-        ${evs.length > 3 ? `<span class="more">+${evs.length - 3} more</span>` : ''}
+        ${myShift && !showShifts ? `<span class="shiftdot">● On ${myShift.start ? fmtTime(myShift.start) : esc(myShift.label)}</span>` : ''}
+        ${items.slice(0, 4).join('')}
+        ${items.length > 4 ? `<span class="more">+${items.length - 4} more</span>` : ''}
       </button>`;
     }
     $('calGrid').innerHTML = html;
+    document.querySelectorAll('[data-calmode]').forEach((b) => b.classList.toggle('on', b.dataset.calmode === view.calMode));
   }
 
   function renderUpcoming() {
+    if (view.calMode === 'shifts' && state.shifts.length) {
+      const rows = [];
+      for (let i = 0; i < 7; i++) {
+        const iso = addDays(todayISO(), i), shs = calShiftsOn(iso);
+        if (shs.length) rows.push(`<li data-date="${iso}"><div class="u-date">${fmtShort(iso)} · ${shs.length} on shift</div>${shs.map((s) =>
+          `<div class="u-title ${isMe(s.person) ? 'mine' : ''}">${esc(shiftWhen(s))} ${esc(s.person)}${s.venue ? ` <span class="u-date">${esc(s.venue)}</span>` : ''}</div>`).join('')}</li>`);
+      }
+      $('upcomingList').innerHTML = rows.join('') || emptyState('No shifts in the next 7 days.');
+      return;
+    }
     const items = [];
     for (let i = 0; i < 7; i++) {
       const iso = addDays(todayISO(), i);
@@ -254,8 +275,15 @@
       state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length });
       ne += events.length; ns += shifts.length;
     }
+    // Show what was just imported: jump to its first date (from today on, if any are upcoming).
+    const dates = pending.flatMap((f) => f.sheets).flatMap((sh) => {
+      const r = sh.kind === 'skip' ? null : sh.kind === 'ready' ? sh.ready : P.build(sh);
+      return r ? [...r.events, ...r.shifts].map((x) => x.date) : [];
+    }).filter(Boolean).sort();
+    const jump = dates.find((d) => d >= todayISO()) || dates[0];
     pending = [];
-    save(); render();
+    save();
+    if (jump) selectDate(jump); else render();
     toast(`Imported ${ne} events and ${ns} shifts.`);
   }
 
@@ -390,6 +418,12 @@
     $('dayToday').onclick = () => selectDate(todayISO());
     $('calPrev').onclick = () => { view.month = new Date(view.month.getFullYear(), view.month.getMonth() - 1, 1); render(); };
     $('calNext').onclick = () => { view.month = new Date(view.month.getFullYear(), view.month.getMonth() + 1, 1); render(); };
+    document.querySelectorAll('[data-calmode]').forEach((b) => b.onclick = () => {
+      view.calMode = b.dataset.calmode;
+      try { localStorage.setItem(STORE + '.calMode', view.calMode); } catch (_) {}
+      if (view.calMode === 'shifts' && !state.shifts.length) toast('No shifts loaded yet. Import a TL Sheet or roster.');
+      render();
+    });
     $('onlyMine').onchange = (e) => {
       view.onlyMine = e.target.checked;
       try { localStorage.setItem(STORE + '.onlyMine', view.onlyMine ? '1' : '0'); } catch (_) {}

@@ -60,6 +60,10 @@
       <div class="card-head">
         <h2 id="calTitle">Calendar</h2>
         <div class="seg">
+          <div class="switch" role="group" aria-label="Calendar shows">
+            <button type="button" class="sw" data-calmode="shifts">Shifts</button>
+            <button type="button" class="sw" data-calmode="events">Events</button>
+          </div>
           <label class="toggle"><input type="checkbox" id="onlyMine"> Only mine</label>
           <button class="btn sm" id="calPrev" aria-label="Previous month">‹</button>
           <span class="month-label" id="calMonth"></span>

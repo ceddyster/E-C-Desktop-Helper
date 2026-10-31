@@ -3,7 +3,7 @@
 A single-page dashboard for daily and weekly Crown work:
 
 - **Daily overview**: the day's events with times, venue and pax, who's working each one, and who's rostered on. Use ‹ / › to change day, or click any calendar day.
-- **Calendar**: a month view with your shifts and events, plus a "Next 7 days" list. Tick **Only mine** to see only the events you're on.
+- **Calendar**: a month view. The **Shifts** view puts every loaded shift (start time, name, bar) on its day; **Events** shows the events instead. The "Next 7 days" list follows the same switch. Tick **Only mine** to see only your own shifts and events. After an import, the calendar jumps to the first date that was loaded.
 - **4 empty add-on slots** for future features.
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.

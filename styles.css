@@ -129,6 +129,14 @@ ul { list-style: none; margin: 0; padding: 0; }
 .empty .btn { margin-top: 10px; }
 
 /* Calendar */
+.switch { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin-right: 8px; }
+.switch .sw { font: inherit; font-size: .85rem; padding: 4px 12px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer; }
+.switch .sw + .sw { border-left: 1px solid var(--border); }
+.switch .sw.on { background: var(--gold); color: var(--accent-text); font-weight: 600; }
+.day .sh { font-size: .72rem; padding: 1px 5px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day .sh b { font-weight: 600; }
+.day .sh.mine { background: var(--mine-soft); border-color: var(--mine); color: var(--mine); }
+@media (max-width: 600px) { .day .sh { font-size: 0; padding: 0; height: 6px; border: 0; background: var(--border); } }
 .cal-wrap { display: grid; grid-template-columns: 1fr 280px; gap: 20px; }
 @media (max-width: 900px) { .cal-wrap { grid-template-columns: 1fr; } }
 .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
@@ -205,3 +213,4 @@ input[type="text"], select {
 .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; font-size: .82rem; }
 a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .chip b { font-weight: 600; color: var(--muted); margin-left: 2px; }
+.day .sh { white-space: normal; line-height: 1.25; overflow: visible; text-overflow: clip; }
