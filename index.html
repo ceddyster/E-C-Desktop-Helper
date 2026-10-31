@@ -19,6 +19,7 @@
       <button class="btn primary" id="btnLoad" title="TL Sheets (.xlsx), BEOs (.pdf), rosters, calendar files">
         📂 Load documents
       </button>
+      <button class="btn" id="btnFolder" hidden title="Link a folder (e.g. your synced SharePoint library) and new TL Sheets and BEOs load automatically">📁 Link folder</button>
       <button class="btn" id="btnDrive" hidden title="Pick files straight from Google Drive (needs config.js)">
         ☁️ Google Drive
       </button>
@@ -109,6 +110,8 @@
         <h2>Loaded documents</h2>
         <button class="btn ghost sm" value="close" aria-label="Close">✕</button>
       </div>
+      <div id="folderPanel"></div>
+      <h3 class="label" style="margin-top:14px">Loaded</h3>
       <ul class="source-list" id="sourceList"></ul>
       <div class="dlg-foot">
         <button class="btn" type="button" id="btnSample">Load sample data</button>
@@ -141,6 +144,7 @@
   <script src="js/parse.js"></script>
   <script src="js/tl.js"></script>
   <script src="js/beo.js"></script>
+  <script src="js/folder.js"></script>
   <script src="js/drive.js"></script>
   <script src="js/app.js"></script>
 </body>

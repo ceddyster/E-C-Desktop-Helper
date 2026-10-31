@@ -33,6 +33,18 @@ Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
+### Linked folder (automatic)
+
+Click **📁 Link folder** and choose the folder where TL Sheets and BEOs are saved. Sub-folders up to 3 levels deep are included. From then on, the dashboard:
+
+- loads every TL workbook and BEO PDF in the folder, skipping files untouched for more than 60 days on the first check
+- checks again every few minutes while it's open, and whenever you switch back to its tab, loading only new or changed files
+- ignores Office lock files (`~$…`) and lists anything it couldn't use under **Documents → skipped**
+
+**SharePoint:** open the document library in the browser and click **Sync** (or **Add shortcut to My files**). It then appears in File Explorer under *OneDrive - Crown Resorts*. Link that folder.
+
+This needs Microsoft Edge or Google Chrome. The browser may ask for permission again after it restarts: click **📁 Reconnect** in the header, or choose "Allow on every visit" when it asks.
+
 ### TL Sheet → bar team roster
 
 Download the week's TL workbook (Excel for the web: *File → Create a Copy → Download a Copy*) and load it with **Load documents**. It's recognised automatically (`js/tl.js`):
@@ -89,6 +101,7 @@ js/parse.js       reads spreadsheets / CSV / ICS and guesses columns
 js/app.js         dashboard, calendar, import review, storage
 js/tl.js          TL workbook reader (bar tabs → shifts)
 js/beo.js         BEO PDF reader (→ events)
+js/folder.js      linked-folder access (File System Access API)
 js/drive.js       optional Google Drive picker
 config.js         optional Google credentials
 vendor/           SheetJS (xlsx) and PDF.js libraries, Apache-2.0

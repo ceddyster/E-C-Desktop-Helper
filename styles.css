@@ -205,6 +205,13 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .chip b { font-weight: 600; color: var(--muted); margin-left: 2px; }
 .day .sh { white-space: normal; line-height: 1.25; overflow: visible; text-overflow: clip; }
 
+/* Linked folder */
+.btn.warn { border-color: var(--gold); background: var(--gold-soft); }
+.folder-box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 4px; }
+.folder-box .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.folder-box details { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+.folder-box details li { padding: 2px 0; word-break: break-all; }
+
 /* BEO details */
 .tag { font-size: .7rem; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--gold-soft); color: var(--text); vertical-align: middle; margin-left: 4px; white-space: nowrap; }
 .event-list li.nobeo { border-left-style: dashed; }
