@@ -32,6 +32,7 @@
     return String(s || '').toLowerCase()
       .replace(/[’']s\b/g, '')                // Phill's → Phill
       .replace(/&/g, ' and ')
+      .replace(/\b(two|three|four|five|six|seven|eight|nine|ten)\b/g, (w) => String(['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'].indexOf(w) + 2))
       .replace(/[^a-z0-9]+/g, ' ')
       .split(' ')
       .filter((w) => w && !STOP.has(w));
@@ -74,11 +75,15 @@
     const t = [...new Set(words(duty))];
     if (!t.length) return 0;
     const b = [...new Set(words([beo.title, beo.subtitle, beo.beo && beo.beo.account].filter(Boolean).join(' ')))];
-    const has = (w) => b.some((x) => wordEq(w, x));
+    // Also look inside the name with spaces removed, so FUTURE2 finds "Future 2" / "Future Two" / "Future2Lunch".
+    const joined = b.join('');
+    const has = (w) => b.some((x) => wordEq(w, x)) || (w.length >= 4 && joined.includes(w));
     const dist = t.filter((w) => !GENERIC.has(w)), gen = t.filter((w) => GENERIC.has(w));
     const md = dist.filter(has).length, mg = gen.filter(has).length;
     if (dist.length && !md) return 0;                       // needs at least one name/company word in common
     let s = (2 * md + mg) / (2 * dist.length + gen.length);
+    // One distinctive word (e.g. FUTURE2) that the BEO also has is enough, whatever the meal word says.
+    if (dist.length === 1 && md === 1 && dist[0].length >= 4) s = Math.max(s, THRESHOLD);
     if (!dist.length && s < 1) return 0;                    // only generic words: all must match
     // The bar ↔ room hint only separates names that already match well enough; it never makes a match on its own.
     if (s >= THRESHOLD && (barSuitsVenue(bars, beo.venue) || (beo.beo && (beo.beo.functions || []).some((f) => barSuitsVenue(bars, f.venue))))) s += 0.15;
@@ -100,7 +105,14 @@
     return hits[0].beo;
   }
 
+  /** The closest BEO even if it isn't close enough, for explaining a non-match. */
+  function closest(duty, bars, beos) {
+    let top = null;
+    for (const beo of beos) { const sc = score(duty, bars, beo); if (!top || sc > top.sc) top = { beo, sc }; }
+    return top;
+  }
+
   const key = (s) => words(s).join(' ');
 
-  global.CrownMatch = { score, best, words, wordEq, barSuitsVenue, key, THRESHOLD };
+  global.CrownMatch = { score, best, closest, words, wordEq, barSuitsVenue, key, THRESHOLD };
 })(typeof window !== 'undefined' ? window : globalThis);

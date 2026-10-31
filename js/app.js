@@ -65,10 +65,24 @@
     const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [], tlDuties: [], missing: [], tasks: [] }));
     const beos = main.filter((b) => b.beo);
     const out = [...main];
-    for (const t of all.filter((e) => e.fromTL)) {
+    const tl = all.filter((e) => e.fromTL);
+    const choice = new Map();
+    for (const t of tl) {
       const manual = (state.links || {})[linkKey(iso, t.title)];
-      const m = manual ? (manual === 'none' ? null : beos.find((b) => b.id === manual) || null)
-        : t.kind === 'setup' ? null : M.best(t.title, t.bars, beos);
+      choice.set(t, { manual, m: manual ? (manual === 'none' ? null : beos.find((b) => b.id === manual) || null)
+        : t.kind === 'setup' ? null : M.best(t.title, t.bars, beos) });
+    }
+    // Last resort: if exactly one TL event and one BEO are left over on the day and they plausibly belong
+    // together (a shared name word, or the bar is in the BEO's room), pair them.
+    const usedBeos = new Set([...choice.values()].map((c) => c.m).filter(Boolean));
+    const leftTL = tl.filter((t) => t.kind !== 'setup' && !choice.get(t).m && !choice.get(t).manual);
+    const leftBeos = beos.filter((b) => !usedBeos.has(b));
+    if (leftTL.length === 1 && leftBeos.length === 1) {
+      const t = leftTL[0], b = leftBeos[0];
+      if (M.score(t.title, t.bars, b) > 0 || M.barSuitsVenue(t.bars, b.venue)) choice.set(t, { m: b, guess: true });
+    }
+    for (const t of tl) {
+      const { manual, m, guess } = choice.get(t);
       if (m) {
         m.barStaff.push(...(t.staffDetail || []));
         m.bars = [...new Set([...m.bars, ...(t.bars || [])])];
@@ -76,10 +90,11 @@
         m.missing.push(...(t.missing || []));
         m.tasks.push(...(t.tasks || []));
         m.manager = m.manager || t.manager;
-        m.tlDuties.push({ duty: t.title, manual: !!manual });
+        m.tlDuties.push({ duty: t.title, manual: !!manual, guess: !!guess });
       } else {
         out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], missing: t.missing || [], tasks: t.tasks || [],
-          noBEO: t.kind !== 'setup', setup: t.kind === 'setup', beoChoices: beos.length, manualNone: manual === 'none' }));
+          noBEO: t.kind !== 'setup', setup: t.kind === 'setup', beoChoices: beos.length, manualNone: manual === 'none',
+          nearest: t.kind !== 'setup' && !manual ? M.closest(t.title, t.bars, beos) : null }));
       }
     }
     return out.sort(byTime);
@@ -162,11 +177,11 @@
   function renderTodayWin() {
     const iso = todayISO();
     $('todayWinDate').textContent = fmtLong(iso);
-    const evs = dayEvents(iso);
+    const evs = dayEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));   // set-up teams last
     const noData = !state.events.length && !state.shifts.length;
     $('todayWinList').innerHTML = evs.length ? evs.map((e) => {
       const st = staffOf(e).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'));
-      return `<li><div class="win-ev"><span>${esc(e.title)}</span>${e.start ? `<span class="t">${fmtTime(e.start)}</span>` : ''}</div>
+      return `<li class="${e.setup ? 'win-setup' : ''}"><div class="win-ev"><span>${e.setup ? 'Set up team' : esc(e.title)}</span>${e.start && !e.setup ? `<span class="t">${fmtTime(e.start)}</span>` : ''}</div>
         ${st.length ? `<div class="win-staff">${st.map((d) => `<span class="${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}</span>`).join('')}</div>`
           : (e.missing || []).length ? '' : '<div class="win-none">No staff listed</div>'}
         ${missingText(e) ? `<div class="win-warn">${esc(missingText(e))}</div>` : ''}</li>`;
@@ -176,9 +191,10 @@
   function renderCalWin() {
     const days = [todayISO(), addDays(todayISO(), 1)];
     $('calWinDays').innerHTML = days.map((iso, i) => {
-      const evs = dayEvents(iso);
+      const evs = dayEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));
       const items = evs.length ? evs.map((e) => {
         const st = staffOf(e), from = st.map((d) => d.start).filter(Boolean).sort()[0];
+        if (e.setup) return `<li class="win-setup-line"><span class="t">${e.start ? fmtTime(e.start) : ''}</span>Set up team<span class="sub">${st.length} staff</span></li>`;
         return `<li><span class="t">${e.start ? fmtTime(e.start) : ''}</span>${esc(e.title)}
           ${st.length || (e.missing || []).length ? `<span class="sub">${st.length} staff${from ? ` from ${fmtTime(from)}` : ''}${(e.missing || []).length ? ` · <span class="warn-text">${esc(missingText(e, true))}</span>` : ''}</span>` : ''}</li>`;
       }).join('') : shiftsOn(iso).map((s) => `<li><span class="t">${esc(shiftWhen(s))}</span>${esc(s.person)}${s.venue ? `<span class="sub">${esc(s.venue)}</span>` : ''}</li>`).join('');
@@ -200,7 +216,7 @@
   function eventCard(e) {
     const b = e.beo;
     const sub = [b && b.beoName, b && b.number && `BEO #${b.number}`, b && b.eventManager && `EM: ${b.eventManager}`].filter(Boolean).map(esc).join(' · ');
-    const meta = [e.venue && !e.noBEO ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
+    const meta = [e.venue && !e.noBEO && !e.setup ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
     const barLine = [e.bars && e.bars.length && `Bar: ${e.bars.join(' / ')}`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
     let chips;
     if (e.barStaff && (e.barStaff.length || b || (e.missing || []).length)) {
@@ -218,9 +234,10 @@
     return `<li class="${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
       <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
       <div>
-        <div class="event-title">${esc(e.title)}${e.setup ? ' <span class="tag">Set up team</span>' : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
+        <div class="event-title">${esc(e.title)}${e.setup ? (/^set up team$/i.test(e.title) ? '' : ' <span class="tag">Set up team</span>') : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
         ${e.noBEO && e.beoChoices ? `<div class="event-meta">Is this one of today's BEOs? ${linkPicker(e.date, e.title, e.manualNone ? 'none' : '')}</div>` : ''}
-        ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
+        ${e.nearest && e.nearest.beo ? `<div class="event-meta small">Closest BEO today: “${esc(e.nearest.beo.title)}” (${e.nearest.sc > 0 ? 'some words match, but not enough' : 'no name words in common'})</div>` : ''}
+        ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : d.guess ? ' (best guess)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
         ${sub ? `<div class="event-meta">${sub}</div>` : ''}
         ${meta ? `<div class="event-meta">${meta}</div>` : ''}
         ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
