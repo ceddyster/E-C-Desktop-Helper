@@ -12,7 +12,13 @@
   const dec = (s) => String(s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
   const attr = (attrs, name) => { const m = attrs.match(new RegExp(`(?:^|\\s)(?:\\w+:)?${name}="([^"]*)"`)); return m ? dec(m[1]) : null; };
   // <b/>, <b val="1"/>, <b val="true"/> are bold; <b val="0"/> is not.
-  const isBoldTag = (xml) => { const m = xml.match(/<(?:\w+:)?b(\s[^>]*)?\/?>/); return !!m && !/val="(0|false)"/.test(m[1] || ''); };
+  // Also bold: a font *named* bold, e.g. "Arial Bold" / "Calibri Bold" (used in the TL sheets).
+  const isBoldTag = (xml) => {
+    const m = xml.match(/<(?:\w+:)?b(\s[^>]*)?\/?>/);
+    if (m && !/val="(0|false)"/.test(m[1] || '')) return true;
+    const n = xml.match(/<(?:\w+:)?(?:name|rFont)\s+val="([^"]*)"/);
+    return !!n && /\b(bold|black|heavy)\b/i.test(n[1]);
+  };
   const section = (xml, tag) => { const m = xml.match(new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`)); return m ? m[1] : ''; };
 
   function text(zip, path) {

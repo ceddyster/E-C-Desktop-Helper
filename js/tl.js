@@ -84,7 +84,11 @@
     const ctx = fmt || {};
     const isBold = (r) => (ctx.bold ? ctx.bold(r, h.duties) : null);
     const isYellow = (r) => (ctx.yellow ? ctx.yellow(r, h.name) : false);
-    const anyBoldInfo = ctx.bold && ctx.hasBold;
+    // Trust bold only if some Duties entry on this tab is actually bold; otherwise fall back to guessing.
+    let anyBoldInfo = false;
+    if (ctx.bold && ctx.hasBold && h.duties >= 0) {
+      for (let r = h.r + 1; r < rows.length && !anyBoldInfo; r++) if (norm((rows[r] || [])[h.duties]) && ctx.bold(r, h.duties)) anyBoldInfo = true;
+    }
     const CODE = /^([A-Z0-9&]{1,8})\s*[-–]\s+/;          // "GB1 - ", "CB1&2 - ", "AST - "
     const SETUP = /^set\s*up\b/i;
 
@@ -92,8 +96,8 @@
     const skipped = [];
     let current = null;
     const newBlock = (title, r, bar, auto) => {
-      const b = { date, title, row: r, bars: bar ? [bar] : [], staffDetail: [], missing: [], tasks: [], auto: !!auto,
-        kind: SETUP.test(title) || SETUP.test(bar || '') ? 'setup' : 'event' };
+      const kind = SETUP.test(title) || SETUP.test(bar || '') ? 'setup' : 'event';
+      const b = { date, title: kind === 'setup' ? 'Set up team' : title, row: r, bars: bar ? [bar] : [], staffDetail: [], missing: [], tasks: [], auto: !!auto, kind };
       blocks.push(b); current = b; return b;
     };
     const barMatch = (b, bar) => !bar || !b.bars.length || b.bars.includes(bar);

@@ -490,7 +490,7 @@
 
   /** Imports TL Sheets / BEOs that are new or changed since the last check. */
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 3;
+  const READER_VERSION = 4;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let scanProgress = '';
 
