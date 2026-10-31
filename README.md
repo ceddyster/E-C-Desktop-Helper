@@ -4,7 +4,7 @@ A single-page dashboard for daily and weekly Crown work:
 
 The main page is a one-page summary made of small windows. Click a window to open its full view.
 
-- **Today**: each event's name, the bar staff working it, and the time each person starts. Click it for the full day view: BEO details, function times, beverage, notes, everyone on shift, and ‹ / › to move between days.
+- **Today**: each event's name, the bar staff working it, and the time each person starts. Click it for the full day view: one row per event, with the event details (BEO, function times, beverage, after-event jobs) on the left and the people working it (plus any unfilled spots) on the right. Use ‹ / › to move between days.
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
 - **4 empty add-on slots** for future features.
 

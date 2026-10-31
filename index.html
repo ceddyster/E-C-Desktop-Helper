@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-10-31g">
+  <link rel="stylesheet" href="styles.css?v=2026-10-31h">
 </head>
 <body>
   <header class="topbar">
@@ -74,16 +74,9 @@
           <button class="btn ghost sm" data-close aria-label="Close">✕</button>
         </div>
       </div>
-      <div class="daily-body">
-        <div>
-          <h3 class="label">Events</h3>
-          <ul class="event-list" id="dailyEvents"></ul>
-        </div>
-        <div>
-          <h3 class="label">On shift</h3>
-          <ul class="shift-list" id="dailyShifts"></ul>
-        </div>
-      </div>
+      <!-- One row per event: the event on the left, the people working it on the right. -->
+      <div class="day-head"><h3 class="label">Events</h3><h3 class="label">On shift</h3></div>
+      <ul class="day-rows" id="dailyEvents"></ul>
     </div>
   </dialog>
 
@@ -191,15 +184,15 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-10-31g"></script>
-  <script src="config.js?v=2026-10-31g"></script>
-  <script src="js/parse.js?v=2026-10-31g"></script>
-  <script src="js/xlsxfmt.js?v=2026-10-31g"></script>
-  <script src="js/tl.js?v=2026-10-31g"></script>
-  <script src="js/beo.js?v=2026-10-31g"></script>
-  <script src="js/folder.js?v=2026-10-31g"></script>
-  <script src="js/match.js?v=2026-10-31g"></script>
-  <script src="js/drive.js?v=2026-10-31g"></script>
-  <script src="js/app.js?v=2026-10-31g"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-10-31h"></script>
+  <script src="config.js?v=2026-10-31h"></script>
+  <script src="js/parse.js?v=2026-10-31h"></script>
+  <script src="js/xlsxfmt.js?v=2026-10-31h"></script>
+  <script src="js/tl.js?v=2026-10-31h"></script>
+  <script src="js/beo.js?v=2026-10-31h"></script>
+  <script src="js/folder.js?v=2026-10-31h"></script>
+  <script src="js/match.js?v=2026-10-31h"></script>
+  <script src="js/drive.js?v=2026-10-31h"></script>
+  <script src="js/app.js?v=2026-10-31h"></script>
 </body>
 </html>

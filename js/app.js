@@ -84,7 +84,7 @@
     for (const t of tl) {
       const { manual, m, guess } = choice.get(t);
       if (m) {
-        m.barStaff.push(...(t.staffDetail || []));
+        m.barStaff.push(...(t.staffDetail || []).map((d) => Object.assign({ duty: t.title }, d)));
         m.bars = [...new Set([...m.bars, ...(t.bars || [])])];
         if (t.notes) m.barNotes.push(t.notes);
         m.missing.push(...(t.missing || []));
@@ -92,7 +92,7 @@
         m.manager = m.manager || t.manager;
         m.tlDuties.push({ duty: t.title, manual: !!manual, guess: !!guess });
       } else {
-        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], missing: t.missing || [], tasks: t.tasks || [],
+        out.push(Object.assign({}, t, { barStaff: (t.staffDetail || []).map((d) => Object.assign({ duty: t.title }, d)), barNotes: t.notes ? [t.notes] : [], missing: t.missing || [], tasks: t.tasks || [],
           noBEO: t.kind !== 'setup', setup: t.kind === 'setup', beoChoices: beos.length, manualNone: manual === 'none',
           nearest: t.kind !== 'setup' && !manual ? M.closest(t.title, t.bars, beos) : null }));
       }
@@ -161,19 +161,38 @@
     const noData = !state.events.length && !state.shifts.length;
 
     const evs = eventsOn(iso);
-    $('dailyEvents').innerHTML = evs.length ? evs.map(eventCard).join('') : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
+    // Each event is a row: event details on the left, the people working it (and unfilled spots) on the right.
+    const rows = evs.map((e) => `<li class="day-row"><div class="day-ev">${eventCard(e)}</div>${staffColumn(e)}</li>`);
+    // Shifts that don't belong to any event shown (e.g. from a plain roster) go in a last row.
+    const placed = new Set(dayEvents(iso).flatMap((e) => (e.barStaff || []).map((d) => `${d.name}|${d.start}`)));
+    const other = shiftsOn(iso).filter((x) => !placed.has(`${x.person}|${x.start}`) && (!view.onlyMine || isMe(x.person)));
+    if (other.length) rows.push(`<li class="day-row"><div class="day-ev"><div class="event-card other-card"><div class="event-title">Other shifts</div><div class="event-meta">Rostered, but not linked to an event</div></div></div>
+      <ul class="shift-list">${other.map((x) => personRow({ name: x.person, start: x.start, end: x.end, label: x.label, bar: x.venue, sub: x.duty || x.role })).join('')}</ul></li>`);
+    $('dailyEvents').innerHTML = rows.length ? rows.join('')
+      : emptyState(noData ? 'No documents loaded yet.' : 'No events on this day.', noData);
+  }
 
-    // Rostered people plus one highlighted blank row per unfilled TL spot, in start-time order.
-    const gaps = dayEvents(iso).flatMap((e) => (e.missing || []).map((m) => ({ gap: true, start: m.start, bar: m.bar, duty: m.duty || e.title })));
-    const sh = [...shiftsOn(iso), ...gaps].sort((a, b) => (a.start || '99').localeCompare(b.start || '99') || (a.gap ? 1 : 0) - (b.gap ? 1 : 0));
-    $('dailyShifts').innerHTML = sh.length ? sh.map((s) => s.gap
-      ? `<li class="gap-row">
-        <span class="who"><span class="blank-name">Unfilled</span>${s.bar ? ` <span class="muted small">Bar · ${esc(s.bar)}</span>` : ''}<br><span class="muted small">${esc(s.duty)}</span></span>
-        <span class="when">${s.start ? fmtTime(s.start) : ''}</span></li>`
-      : `<li class="${isMe(s.person) ? 'mine' : ''}">
-        <span class="who">${esc(s.person)}${s.role ? ` <span class="muted small">${esc(s.role)}</span>` : ''}${s.duty ? `<br><span class="muted small">${esc(s.duty)}</span>` : ''}</span>
-        <span class="when">${s.start ? `${fmtTime(s.start)}${s.end ? '–' + fmtTime(s.end) : ''}` : esc(s.label)}</span></li>`).join('')
-      : emptyState(state.shifts.length ? 'Nobody rostered.' : 'Load a roster to see who\'s on.');
+  function personRow(p) {
+    if (p.gap) return `<li class="gap-row">
+      <span class="who"><span class="blank-name">Unfilled</span>${p.bar ? ` <span class="muted small">Bar · ${esc(p.bar)}</span>` : ''}${p.sub ? `<br><span class="muted small">${esc(p.sub)}</span>` : ''}</span>
+      <span class="when">${p.start ? fmtTime(p.start) : ''}</span></li>`;
+    return `<li class="${isMe(p.name) ? 'mine' : ''}">
+      <span class="who">${esc(p.name)}${p.bar ? ` <span class="muted small">Bar · ${esc(p.bar)}</span>` : ''}${p.sub ? `<br><span class="muted small">${esc(p.sub)}</span>` : ''}</span>
+      <span class="when">${p.start ? `${fmtTime(p.start)}${p.end ? '–' + fmtTime(p.end) : ''}` : esc(p.label || '')}</span></li>`;
+  }
+
+  /** The right-hand column for an event: its staff and unfilled spots, in start-time order. */
+  function staffColumn(e) {
+    // Name the TL group under each person only when the event has more than one (e.g. main bar, BIR, champagne).
+    const multi = (e.tlDuties || []).length > 1;
+    const same = (d) => !d || !multi && !e.noBEO ? true : M.key(d) === M.key(e.title);
+    const people = e.barStaff && (e.barStaff.length || e.beo || e.fromTL || (e.missing || []).length)
+      ? e.barStaff.map((d) => ({ name: d.name, start: d.start, bar: d.bar, sub: same(d.duty) ? '' : d.duty }))
+      : staffFor(e).map((n) => ({ name: n }));
+    const gaps = (e.missing || []).map((m) => ({ gap: true, start: m.start, bar: m.bar, sub: same(m.duty) ? '' : m.duty }));
+    const all = [...people, ...gaps].sort((a, b) => (a.start || '99').localeCompare(b.start || '99') || (a.gap ? 1 : 0) - (b.gap ? 1 : 0));
+    return `<ul class="shift-list">${all.length ? all.map(personRow).join('')
+      : `<li class="empty">${e.beo ? 'No bar staff on the TL sheet' : 'No staff listed'}</li>`}</ul>`;
   }
 
   /* ---------- Compact windows (main page) ---------- */
@@ -224,20 +243,11 @@
     const sub = [b && b.beoName, b && b.number && `BEO #${b.number}`, b && b.eventManager && `EM: ${b.eventManager}`].filter(Boolean).map(esc).join(' · ');
     const meta = [e.venue && !e.noBEO && !e.setup ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
     const barLine = [e.bars && e.bars.length && `Bar: ${e.bars.join(' / ')}`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
-    let chips;
-    if (e.barStaff && (e.barStaff.length || b || (e.missing || []).length)) {
-      chips = e.barStaff.length
-        ? e.barStaff.map((d) => `<span class="chip ${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}${d.bar && e.bars.length > 1 ? ` · ${esc(d.bar)}` : ''}</span>`).join('')
-        : `<span class="chip none">${(e.missing || []).length ? 'No one rostered yet' : 'No bar staff on the TL sheet'}</span>`;
-    } else {
-      const staff = staffFor(e);
-      chips = staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>';
-    }
     const fns = b && b.functions && b.functions.length ? `<details class="more-info"><summary>Function times</summary><table>${b.functions.map((f) =>
       `<tr><td>${f.start ? fmtTime(f.start) + '–' + fmtTime(f.end) : ''}</td><td>${esc(f.event)}</td><td>${esc(f.venue)}</td><td>${f.gtd ? f.gtd + ' gtd' : ''}</td></tr>`).join('')}</table></details>` : '';
     const bev = b && b.beverage && b.beverage.length ? `<details class="more-info"><summary>Beverage</summary><ul>${b.beverage.map((l) =>
       /^\d{1,2}:\d{2}\s*-/.test(l) ? `<li class="sub">${esc(l)}</li>` : `<li>${esc(l)}</li>`).join('')}</ul></details>` : '';
-    return `<li class="${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
+    return `<div class="event-card ${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
       <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
       <div>
         <div class="event-title">${esc(e.title)}${e.setup ? (/^set up team$/i.test(e.title) ? '' : ' <span class="tag">Set up team</span>') : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
@@ -248,11 +258,10 @@
         ${meta ? `<div class="event-meta">${meta}</div>` : ''}
         ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
         ${(e.barNotes || []).concat(e.barStaff ? [] : [e.notes]).filter(Boolean).map((n) => `<div class="event-meta note">${esc(n)}</div>`).join('')}
-        <div class="chips">${chips}</div>
         ${missingText(e) ? `<div class="warn-line">${esc(missingText(e))}</div>` : ''}
         ${e.tasks && e.tasks.length ? `<div class="tasks"><span class="label">${e.setup ? 'Duties' : 'After the event'}</span><ul>${e.tasks.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
         ${fns}${bev}
-      </div></li>`;
+      </div></div>`;
   }
 
   function renderCalendar() {
