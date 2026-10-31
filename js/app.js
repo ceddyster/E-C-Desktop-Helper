@@ -62,24 +62,35 @@
   const linkKey = (date, duty) => `${date}|${M.key(duty)}`;
   function dayEvents(iso) {
     const all = state.events.filter((e) => e.date === iso);
-    const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [], tlDuties: [] }));
+    const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [], tlDuties: [], missing: [], tasks: [] }));
     const beos = main.filter((b) => b.beo);
     const out = [...main];
     for (const t of all.filter((e) => e.fromTL)) {
       const manual = (state.links || {})[linkKey(iso, t.title)];
       const m = manual ? (manual === 'none' ? null : beos.find((b) => b.id === manual) || null)
-        : M.best(t.title, t.bars, beos);
+        : t.kind === 'setup' ? null : M.best(t.title, t.bars, beos);
       if (m) {
         m.barStaff.push(...(t.staffDetail || []));
         m.bars = [...new Set([...m.bars, ...(t.bars || [])])];
         if (t.notes) m.barNotes.push(t.notes);
+        m.missing.push(...(t.missing || []));
+        m.tasks.push(...(t.tasks || []));
         m.manager = m.manager || t.manager;
         m.tlDuties.push({ duty: t.title, manual: !!manual });
       } else {
-        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], noBEO: true, beoChoices: beos.length, manualNone: manual === 'none' }));
+        out.push(Object.assign({}, t, { barStaff: t.staffDetail || [], barNotes: t.notes ? [t.notes] : [], missing: t.missing || [], tasks: t.tasks || [],
+          noBEO: t.kind !== 'setup', setup: t.kind === 'setup', beoChoices: beos.length, manualNone: manual === 'none' }));
       }
     }
     return out.sort(byTime);
+  }
+  /** "⚠ 3 staff needed (4:15pm CB)" for events with unfilled TL spots. */
+  function missingText(e, short) {
+    const n = (e.missing || []).length;
+    if (!n) return '';
+    if (short) return `⚠ ${n} missing`;
+    const when = [...new Set(e.missing.map((m) => [m.start && fmtTime(m.start), m.bar].filter(Boolean).join(' ')).filter(Boolean))];
+    return `⚠ ${n} staff still needed${when.length ? ` (${when.join(', ')})` : ''}`;
   }
   function setLink(date, duty, value) {
     state.links = state.links || {};
@@ -157,7 +168,8 @@
       const st = staffOf(e).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'));
       return `<li><div class="win-ev"><span>${esc(e.title)}</span>${e.start ? `<span class="t">${fmtTime(e.start)}</span>` : ''}</div>
         ${st.length ? `<div class="win-staff">${st.map((d) => `<span class="${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}</span>`).join('')}</div>`
-          : '<div class="win-none">No staff listed</div>'}</li>`;
+          : (e.missing || []).length ? '' : '<div class="win-none">No staff listed</div>'}
+        ${missingText(e) ? `<div class="win-warn">${esc(missingText(e))}</div>` : ''}</li>`;
     }).join('') : `<li class="win-empty">${noData ? 'No documents loaded yet. <button class="btn primary sm" data-act="load">📂 Load documents</button>' : 'Nothing on today.'}</li>`;
   }
 
@@ -168,7 +180,7 @@
       const items = evs.length ? evs.map((e) => {
         const st = staffOf(e), from = st.map((d) => d.start).filter(Boolean).sort()[0];
         return `<li><span class="t">${e.start ? fmtTime(e.start) : ''}</span>${esc(e.title)}
-          ${st.length ? `<span class="sub">${st.length} staff${from ? ` from ${fmtTime(from)}` : ''}</span>` : ''}</li>`;
+          ${st.length || (e.missing || []).length ? `<span class="sub">${st.length} staff${from ? ` from ${fmtTime(from)}` : ''}${(e.missing || []).length ? ` · <span class="warn-text">${esc(missingText(e, true))}</span>` : ''}</span>` : ''}</li>`;
       }).join('') : shiftsOn(iso).map((s) => `<li><span class="t">${esc(shiftWhen(s))}</span>${esc(s.person)}${s.venue ? `<span class="sub">${esc(s.venue)}</span>` : ''}</li>`).join('');
       return `<div class="win-day"><h3>${i ? 'Tomorrow' : 'Today'} · ${fmtShort(iso)}</h3><ul>${items || '<li class="win-empty">Nothing on.</li>'}</ul></div>`;
     }).join('');
@@ -191,10 +203,10 @@
     const meta = [e.venue && !e.noBEO ? e.venue : '', e.pax && `${e.pax} guests`].filter(Boolean).map(esc).join(' · ');
     const barLine = [e.bars && e.bars.length && `Bar: ${e.bars.join(' / ')}`, e.manager && `Manager: ${e.manager}`].filter(Boolean).map(esc).join(' · ');
     let chips;
-    if (e.barStaff && (e.barStaff.length || b)) {
+    if (e.barStaff && (e.barStaff.length || b || (e.missing || []).length)) {
       chips = e.barStaff.length
         ? e.barStaff.map((d) => `<span class="chip ${isMe(d.name) ? 'me' : ''}">${esc(d.name)}${d.start ? ` <b>${fmtTime(d.start)}</b>` : ''}${d.bar && e.bars.length > 1 ? ` · ${esc(d.bar)}` : ''}</span>`).join('')
-        : '<span class="chip none">No bar staff on the TL sheet</span>';
+        : `<span class="chip none">${(e.missing || []).length ? 'No one rostered yet' : 'No bar staff on the TL sheet'}</span>`;
     } else {
       const staff = staffFor(e);
       chips = staff.length ? staff.map((n) => `<span class="chip ${isMe(n) ? 'me' : ''}">${esc(n)}</span>`).join('') : '<span class="chip none">No staff listed</span>';
@@ -206,7 +218,7 @@
     return `<li class="${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
       <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
       <div>
-        <div class="event-title">${esc(e.title)}${e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
+        <div class="event-title">${esc(e.title)}${e.setup ? ' <span class="tag">Set up team</span>' : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
         ${e.noBEO && e.beoChoices ? `<div class="event-meta">Is this one of today's BEOs? ${linkPicker(e.date, e.title, e.manualNone ? 'none' : '')}</div>` : ''}
         ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
         ${sub ? `<div class="event-meta">${sub}</div>` : ''}
@@ -214,6 +226,8 @@
         ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
         ${(e.barNotes || []).concat(e.barStaff ? [] : [e.notes]).filter(Boolean).map((n) => `<div class="event-meta note">${esc(n)}</div>`).join('')}
         <div class="chips">${chips}</div>
+        ${missingText(e) ? `<div class="warn-line">${esc(missingText(e))}</div>` : ''}
+        ${e.tasks && e.tasks.length ? `<div class="tasks"><span class="label">${e.setup ? 'Duties' : 'After the event'}</span><ul>${e.tasks.map((t) => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}
         ${fns}${bev}
       </div></li>`;
   }
@@ -245,9 +259,11 @@
       const shs = calShiftsOn(iso);
       const myShift = shiftsOn(iso).find((s) => isMe(s.person));
       const showShifts = view.calMode === 'shifts' && state.shifts.length;
+      const gaps = evs.filter((e) => (e.missing || []).length).map((e) =>
+        `<span class="gap" title="${esc(e.title)}: ${esc(missingText(e))}">${esc(missingText(e, true))}<br><span class="muted">${esc(e.bars && e.bars.length ? e.bars.join('/') : e.title)}</span></span>`);
       const items = showShifts
-        ? shs.map((s) => `<span class="sh ${isMe(s.person) ? 'mine' : ''}" title="${esc(s.person)} · ${esc(shiftWhen(s))}${s.venue ? ' · ' + esc(s.venue) : ''}"><b>${esc(shiftWhen(s))}</b> ${esc(shortName(s.person))}${s.venue ? `<br><span class="muted">${esc(s.venue)}</span>` : ''}</span>`)
-        : evs.map((e) => `<span class="ev ${eventIsMine(e) ? 'mine' : ''}" title="${esc(e.title)}">${e.start ? fmtTime(e.start) + ' ' : ''}${esc(e.title)}</span>`);
+        ? gaps.concat(shs.map((s) => `<span class="sh ${isMe(s.person) ? 'mine' : ''}" title="${esc(s.person)} · ${esc(shiftWhen(s))}${s.venue ? ' · ' + esc(s.venue) : ''}"><b>${esc(shiftWhen(s))}</b> ${esc(shortName(s.person))}${s.venue ? `<br><span class="muted">${esc(s.venue)}</span>` : ''}</span>`))
+        : evs.map((e) => `<span class="ev ${eventIsMine(e) ? 'mine' : ''} ${(e.missing || []).length ? 'short' : ''}" title="${esc(e.title)}${(e.missing || []).length ? ' · ' + esc(missingText(e)) : ''}">${(e.missing || []).length ? '⚠ ' : ''}${e.start ? fmtTime(e.start) + ' ' : ''}${esc(e.title)}</span>`);
       const cls = ['day', !week && d.getMonth() !== m.getMonth() && 'other', iso === today && 'today', iso === view.selected && 'selected'].filter(Boolean).join(' ');
       html += `<button type="button" class="${cls}" data-date="${iso}" aria-label="${fmtLong(iso)}, ${shs.length} shifts, ${evs.length} events">
         <span class="num">${d.getDate()}</span>${week ? `<span class="wk-dow">${DOW[i]}</span>` : ''}
@@ -457,7 +473,7 @@
 
   /** Imports TL Sheets / BEOs that are new or changed since the last check. */
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 2;
+  const READER_VERSION = 3;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let scanProgress = '';
 

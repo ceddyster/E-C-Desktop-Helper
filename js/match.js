@@ -17,13 +17,16 @@
   const GENERIC = new Set(['wedding', 'weddings', 'reception', 'ceremony', 'dinner', 'lunch', 'luncheon', 'breakfast', 'brunch',
     'cocktail', 'cocktails', 'conference', 'gala', 'function', 'event', 'events', 'party', 'day', 'night', 'awards', 'award',
     'drinks', 'networking', 'meeting', 'seminar', 'forum', 'summit', 'celebration', 'ball', 'launch', 'presentation',
-    'morning', 'afternoon', 'evening', 'tea', 'canapes', 'pre', 'post', 'annual', 'group', 'banquet']);
+    'morning', 'afternoon', 'evening', 'tea', 'canapes', 'pre', 'post', 'annual', 'group', 'banquet',
+    'foyer', 'bar', 'bars', 'bir', 'champagne', 'wine', 'beer', 'service']);
 
   // TL bar code prefixes → room names as they appear on BEOs.
   const BAR_ROOMS = [
     [/^AST/i, 'astral'], [/^CB/i, 'crown ballroom'], [/^GB/i, 'grand ballroom'], [/^STU/i, 'studio'],
     [/^RIV/i, 'riverside'], [/^PAV/i, 'pavilion'], [/^POOL/i, 'pool'], [/^BOT/i, 'botanical'],
   ];
+
+  const THRESHOLD = 0.6;
 
   function words(s) {
     return String(s || '').toLowerCase()
@@ -77,11 +80,10 @@
     if (dist.length && !md) return 0;                       // needs at least one name/company word in common
     let s = (2 * md + mg) / (2 * dist.length + gen.length);
     if (!dist.length && s < 1) return 0;                    // only generic words: all must match
-    if (barSuitsVenue(bars, beo.venue) || (beo.beo && (beo.beo.functions || []).some((f) => barSuitsVenue(bars, f.venue)))) s += 0.15;
+    // The bar ↔ room hint only separates names that already match well enough; it never makes a match on its own.
+    if (s >= THRESHOLD && (barSuitsVenue(bars, beo.venue) || (beo.beo && (beo.beo.functions || []).some((f) => barSuitsVenue(bars, f.venue))))) s += 0.15;
     return s;
   }
-
-  const THRESHOLD = 0.6;
 
   /** Best-matching BEO for a TL duty among that day's BEOs, or null. */
   function best(duty, bars, beos) {

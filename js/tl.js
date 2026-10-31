@@ -6,9 +6,9 @@
  *   B1 "BARS"                                  K1 "Monday, October 26, 2026"
  *   B3 "MANAGER"   C3 "Cedric"
  *   row 5: Name | ID | Start | 1/2 | 1st 15 | 2nd 15 | Finish | Hours | Bar | Duties
- *   rows 6+: one staff member per row. Bar = which bar (STUDIO, AST, CB2...),
- *            Duties = the event they're working. Rows with only Duties text are notes
- *            ("DUTY NOTES", "STUDIO - COMPLETE CLEAN & CLEAR").
+ *   rows 6+: Name / Start / Bar per person. BOLD Duties text = event name; the people under it
+ *            work that event. Non-bold Duties text = the team's after-event jobs. A row with a
+ *            start time but no name (highlighted yellow) is an unfilled spot.
  *   "Bar Hrs:" / "CLOSING DUTIES" marks the end of the staff list.
  */
 (function (global) {
@@ -52,7 +52,7 @@
     return null;
   }
 
-  function readBarTab(sheetName, rows, fileName) {
+  function readBarTab(sheetName, rows, fileName, fmt) {
     const warnings = [];
     const h = findHeader(rows);
     if (!h) return { events: [], shifts: [], warnings: [`${sheetName}: couldn't find the Name / Bar / Duties headings.`] };
@@ -72,8 +72,41 @@
     }
     if (!date) return { events: [], shifts: [], warnings: [`${sheetName}: couldn't work out the date.`] };
 
-    const staff = [];        // {name, start, bar, duty, status}
-    const notes = [];        // free text rows in Duties
+    /* How a bar tab is laid out (from the real sheets):
+     *  - A BOLD entry in Duties is an event name. Everyone listed under it, up to the next bold
+     *    entry, works that event. The Bar column cross-checks this: a row whose bar belongs to an
+     *    earlier event joins that one.
+     *  - Non-bold Duties text is the team's job list for after their event
+     *    ("GB1 - CLEAN & RESET FOR LGPA COCKTAIL"). It's attached by bar code, else to the event
+     *    whose block it sits in. Lines on consecutive rows are one task.
+     *  - A row with no name but a start time (usually highlighted yellow) is an unfilled spot.
+     */
+    const ctx = fmt || {};
+    const isBold = (r) => (ctx.bold ? ctx.bold(r, h.duties) : null);
+    const isYellow = (r) => (ctx.yellow ? ctx.yellow(r, h.name) : false);
+    const anyBoldInfo = ctx.bold && ctx.hasBold;
+    const CODE = /^([A-Z0-9&]{1,8})\s*[-–]\s+/;          // "GB1 - ", "CB1&2 - ", "AST - "
+    const SETUP = /^set\s*up\b/i;
+
+    const blocks = [];
+    const skipped = [];
+    let current = null;
+    const newBlock = (title, r, bar, auto) => {
+      const b = { date, title, row: r, bars: bar ? [bar] : [], staffDetail: [], missing: [], tasks: [], auto: !!auto,
+        kind: SETUP.test(title) || SETUP.test(bar || '') ? 'setup' : 'event' };
+      blocks.push(b); current = b; return b;
+    };
+    const barMatch = (b, bar) => !bar || !b.bars.length || b.bars.includes(bar);
+    const pick = (r, bar) => {
+      if (current && barMatch(current, bar)) { if (bar && !current.bars.includes(bar)) current.bars.push(bar); return current; }
+      const earlier = bar && [...blocks].reverse().find((b) => b.bars.includes(bar));
+      if (earlier) return earlier;
+      // A bar we haven't seen under any event (e.g. the SET UP team).
+      return newBlock(SETUP.test(bar || '') ? 'Set up team' : (bar ? `${bar} bar` : 'Bar team'), r, bar, true);
+    };
+
+    const lines = [];        // non-bold Duties text: {r, text}
+    let prevWasTask = false;
     for (let r = h.r + 1; r < rows.length; r++) {
       const row = rows[r] || [];
       const rowText = row.map(low).join(' ');
@@ -82,81 +115,97 @@
       const duty = h.duties >= 0 ? norm(row[h.duties]) : '';
       const bar = h.bar >= 0 ? norm(row[h.bar]).toUpperCase() : '';
       const startRaw = h.start >= 0 ? row[h.start] : '';
-      if (name && !/^\d+$/.test(name)) {
-        const start = P().toTime(startRaw);
+      const start = P().toTime(startRaw);
+      const person = name && !/^\d+$/.test(name);
+
+      // Is this Duties entry an event name? Bold says so. Without formatting info, guess:
+      // text that isn't a "BAR - task" line, on a row that has someone (or a spot) and a bar.
+      let isEvent = false;
+      if (duty) {
+        const b = isBold(r);
+        if (anyBoldInfo) isEvent = !!b;
+        else isEvent = !CODE.test(duty) && !!bar && (person || !!start)
+          && (!prevWasTask || !current || !current.bars.includes(bar));   // a new bar means a new event
+      }
+      if (isEvent) newBlock(duty, r, bar);
+      prevWasTask = duty && !isEvent;
+
+      if (person) {
         const status = !start && NOT_WORKING.test(norm(startRaw)) ? norm(startRaw) : '';
-        staff.push({ name: niceName(name), start, bar, duty, status });
-      } else if (duty) {
-        notes.push({ text: duty, bar });
-      } else if (bar && staff.length) {
-        // Bar filled but no name (e.g. TBC slot) – keep the bar in play for following notes.
+        if (status) { skipped.push(`${niceName(name)} (${status})`); }
+        else pick(r, bar).staffDetail.push({ name: niceName(name), start, bar });
+      } else if (start || isYellow(r)) {
+        if (start || bar) pick(r, bar).missing.push({ start, bar });
       }
+      if (duty && !isEvent) lines.push({ r, text: duty });
     }
 
-    // Group staff into events. A row with a Bar but no Duties belongs to the last event at that bar.
-    const events = [];
-    const byKey = new Map();
-    const lastDutyAtBar = {};
-    let lastDuty = '';
-    for (const s of staff) {
-      if (s.status) continue;
-      let duty = s.duty || (s.bar && lastDutyAtBar[s.bar]) || '';
-      if (!duty) duty = lastDuty;      // blank Duties = same event as the row above
-      if (!duty) duty = s.bar ? `${s.bar} bar` : 'Bar shift';
-      if (s.bar) lastDutyAtBar[s.bar] = duty;
-      lastDuty = duty;
-      const key = duty.toLowerCase();
-      let ev = byKey.get(key);
-      if (!ev) {
-        ev = { date, title: duty, start: null, end: null, venue: '', bars: [], pax: '', notes: '', staff: [], staffDetail: [], manager, team: 'Bars', sheet: sheetName, fromTL: true };
-        byKey.set(key, ev); events.push(ev);
+    // Join job-list lines into tasks: a new task starts at a "BAR - …" line or after a gap.
+    const tasks = [];
+    for (const l of lines) {
+      if (/^(duty|set\s*up)\s+notes?$/i.test(l.text)) continue;
+      const prev = tasks[tasks.length - 1];
+      if (prev && prev.lastRow === l.r - 1 && !CODE.test(l.text)) { prev.text += ' ' + l.text; prev.lastRow = l.r; }
+      else tasks.push({ r: l.r, lastRow: l.r, text: l.text, code: (l.text.match(CODE) || [])[1] || '' });
+    }
+    const blockAt = (r) => [...blocks].reverse().find((b) => b.row <= r) || blocks[0];
+    for (const t of tasks) {
+      let target = null;
+      if (t.code) {
+        const fits = (b) => b.bars.some((bar) => bar === t.code || t.code.startsWith(bar) || bar.startsWith(t.code));
+        target = [...blocks].reverse().find((b) => b.row <= t.r && fits(b)) || blocks.find(fits);
       }
-      if (s.bar && !ev.bars.includes(s.bar)) ev.bars.push(s.bar);
-      if (s.start && (!ev.start || s.start < ev.start)) ev.start = s.start;
-      ev.staff.push(s.name);
-      ev.staffDetail.push({ name: s.name, start: s.start, bar: s.bar });
+      target = target || blockAt(t.r);
+      if (target) target.tasks.push(t.text);
     }
-    events.forEach((e) => { e.venue = e.bars.join(' / '); });
 
-    // Attach notes: a line starting with a bar code ("AST - CLEAN & RESET…") goes to that bar's event;
-    // lines that don't start with a bar code continue the previous note.
-    const noteGroups = [];
-    for (const n of notes) {
-      if (/^duty notes?$/i.test(n.text)) continue;
-      const lead = n.text.split(/\s*[-–:]\s*/)[0].toUpperCase();
-      const known = events.some((e) => e.bars.includes(lead));
-      if (known || !noteGroups.length) noteGroups.push({ bar: known ? lead : '', text: n.text });
-      else noteGroups[noteGroups.length - 1].text += ' ' + n.text;
-    }
-    const dayNotes = [];
-    for (const g of noteGroups) {
-      const ev = g.bar && events.find((e) => e.bars.includes(g.bar));
-      if (ev) ev.notes = ev.notes ? `${ev.notes} · ${g.text}` : g.text;
-      else dayNotes.push(g.text);
-    }
-    if (dayNotes.length && events.length) {
-      events[0].notes = [events[0].notes, ...dayNotes].filter(Boolean).join(' · ');
-    }
+    const events = blocks.filter((b) => b.staffDetail.length || b.missing.length || !b.auto).map((b) => {
+      const starts = b.staffDetail.map((d) => d.start).concat(b.missing.map((m) => m.start)).filter(Boolean).sort();
+      return {
+        date, title: b.title, start: starts[0] || null, end: null, venue: b.bars.join(' / '), bars: b.bars, pax: '',
+        notes: '', tasks: b.tasks, missing: b.missing, kind: b.kind,
+        staff: b.staffDetail.map((d) => d.name), staffDetail: b.staffDetail,
+        manager, team: 'Bars', sheet: sheetName, fromTL: true,
+      };
+    });
 
     const shifts = [];
     events.forEach((e) => e.staffDetail.forEach((d) => shifts.push({
       date, person: d.name, start: d.start, end: null, label: '', role: d.bar ? `Bar · ${d.bar}` : 'Bar', venue: d.bar, duty: e.title,
     })));
-    const out = staff.filter((s) => s.status);
-    if (out.length) warnings.push(`${sheetName}: skipped ${out.map((s) => `${s.name} (${s.status})`).join(', ')}.`);
+    if (skipped.length) warnings.push(`${sheetName}: skipped ${skipped.join(', ')}.`);
+    const missing = events.reduce((n, e) => n + e.missing.length, 0);
+    if (missing) warnings.push(`${sheetName}: ${missing} unfilled spot${missing === 1 ? '' : 's'}.`);
     if (!events.length) warnings.push(`${sheetName}: no bar staff listed.`);
+    if (!anyBoldInfo) warnings.push(`${sheetName}: couldn't read bold formatting, so event names were guessed.`);
     return { events, shifts, warnings, date };
   }
 
   /** If this workbook is a TL sheet, returns one ready-to-import item; otherwise null. */
-  function readTLWorkbook(wb, fileName) {
+  /** bold: { sheetName: Set("K6", …) } from CrownXFmt, or null if formatting couldn't be read. */
+  function readTLWorkbook(wb, fileName, bold) {
     const tabs = wb.SheetNames.filter(isBarTab);
     if (!tabs.length) return null;
+    const X = global.XLSX.utils;
     const all = { events: [], shifts: [], warnings: [] };
     const read = [];
     for (const sn of tabs) {
-      const rows = global.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '', blankrows: true });
-      const r = readBarTab(sn, rows, fileName);
+      const ws = wb.Sheets[sn];
+      if (!ws || !ws['!ref']) continue;
+      const rows = X.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: true });
+      // rows[r][c] ↔ sheet cell, offset by where the used range starts.
+      const rg = X.decode_range(ws['!ref']);
+      const ref = (r, c) => X.encode_cell({ r: rg.s.r + r, c: rg.s.c + c });
+      const set = bold && bold[sn];
+      const fmt = {
+        hasBold: !!(set && set.size),
+        bold: set ? (r, c) => set.has(ref(r, c)) : null,
+        yellow: (r, c) => {
+          const cell = ws[ref(r, c)], f = cell && cell.s && cell.s.fgColor;
+          return !!(f && f.rgb && /^(FF)?FFFF00$/i.test(f.rgb));
+        },
+      };
+      const r = readBarTab(sn, rows, fileName, fmt);
       all.events.push(...r.events); all.shifts.push(...r.shifts); all.warnings.push(...r.warnings);
       read.push(sn.trim());
     }

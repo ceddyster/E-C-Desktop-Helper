@@ -282,9 +282,12 @@
       const names = global.XLSX.read(buf, { type: 'array', bookSheets: true }).SheetNames;
       const bars = names.filter(global.CrownTL.isBarTab);
       if (bars.length) {
-        const wbBars = global.XLSX.read(buf, { type: 'array', cellDates: true, sheets: bars });
+        const wbBars = global.XLSX.read(buf, { type: 'array', cellDates: true, cellStyles: true, sheets: bars });
         wbBars.SheetNames = names;
-        return [global.CrownTL.readTLWorkbook(wbBars, name)];
+        // Event names are the bold entries in Duties; read which cells are bold (xlsx only).
+        let bold = null;
+        try { if (global.CrownXFmt && /\.xls[xm]$/i.test(name)) bold = global.CrownXFmt.boldCells(buf, bars); } catch (e) { console.warn('Bold formatting not read:', e); }
+        return [global.CrownTL.readTLWorkbook(wbBars, name, bold)];
       }
       if (/(^|[^a-z])tl([^a-z]|$)/i.test(name)) {
         throw new Error(`looks like a TL Sheet but has no bar tabs. Tabs: ${names.slice(0, 15).join(', ')}${names.length > 15 ? '…' : ''}`);
