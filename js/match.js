@@ -77,8 +77,15 @@
     const b = [...new Set(words([beo.title, beo.subtitle, beo.beo && beo.beo.account].filter(Boolean).join(' ')))];
     // Also look inside the name with spaces removed, so FUTURE2 finds "Future 2" / "Future Two" / "Future2Lunch".
     const joined = b.join('');
-    const has = (w) => b.some((x) => wordEq(w, x)) || (w.length >= 4 && joined.includes(w));
-    const dist = t.filter((w) => !GENERIC.has(w)), gen = t.filter((w) => GENERIC.has(w));
+    // Initials: RMHC ↔ "Ronald McDonald House Charities", LGPA ↔ "Ladies Golf Professional Association".
+    const allWords = String([beo.title, beo.subtitle, beo.beo && beo.beo.account].filter(Boolean).join(' ')).toLowerCase()
+      .replace(/[’']s\b/g, '').replace(/&/g, ' ').replace(/[^a-z0-9]+/g, ' ').split(' ').filter((x) => x && !['of', 'the', 'and', 'for', 'a', 'an', 'inc'].includes(x));
+    const initials = allWords.filter((x) => !/^\d/.test(x)).map((x) => x[0]).join('');
+    const has = (w) => b.some((x) => wordEq(w, x)) || (w.length >= 4 && joined.includes(w))
+      || (/^[a-z]{3,6}$/.test(w) && initials.includes(w));
+    // Numbers (years like 2026, "Day 2") don't identify an event, so they count like event-type words.
+    const generic = (w) => GENERIC.has(w) || /^\d+$/.test(w);
+    const dist = t.filter((w) => !generic(w)), gen = t.filter((w) => generic(w));
     const md = dist.filter(has).length, mg = gen.filter(has).length;
     if (dist.length && !md) return 0;                       // needs at least one name/company word in common
     let s = (2 * md + mg) / (2 * dist.length + gen.length);

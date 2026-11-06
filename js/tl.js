@@ -95,9 +95,17 @@
     const blocks = [];
     const skipped = [];
     let current = null;
+    const sameName = (x) => String(x).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
     const newBlock = (title, r, bar, auto) => {
       const kind = SETUP.test(title) || SETUP.test(bar || '') ? 'setup' : 'event';
-      const b = { date, title: kind === 'setup' ? 'Set up team' : title, row: r, bars: bar ? [bar] : [], staffDetail: [], missing: [], tasks: [], auto: !!auto, kind };
+      const name = kind === 'setup' ? 'Set up team' : title;
+      // The same event name written again (e.g. on every row, or further down the tab) continues that event.
+      const again = blocks.find((x) => sameName(x.title) === sameName(name));
+      if (again) {
+        if (bar && !again.bars.includes(bar)) again.bars.push(bar);
+        again.starts.push(r); current = again; return again;
+      }
+      const b = { date, title: name, row: r, starts: [r], bars: bar ? [bar] : [], staffDetail: [], missing: [], tasks: [], auto: !!auto, kind };
       blocks.push(b); current = b; return b;
     };
     const barMatch = (b, bar) => !bar || !b.bars.length || b.bars.includes(bar);
@@ -152,12 +160,17 @@
       if (prev && prev.lastRow === l.r - 1 && !CODE.test(l.text)) { prev.text += ' ' + l.text; prev.lastRow = l.r; }
       else tasks.push({ r: l.r, lastRow: l.r, text: l.text, code: (l.text.match(CODE) || [])[1] || '' });
     }
-    const blockAt = (r) => [...blocks].reverse().find((b) => b.row <= r) || blocks[0];
+    // The event a row sits under: the one whose name appears most recently above it.
+    const blockAt = (r) => {
+      let best = null, at = -1;
+      for (const b of blocks) for (const s0 of b.starts) if (s0 <= r && s0 > at) { best = b; at = s0; }
+      return best || blocks[0];
+    };
     for (const t of tasks) {
       let target = null;
       if (t.code) {
         const fits = (b) => b.bars.some((bar) => bar === t.code || t.code.startsWith(bar) || bar.startsWith(t.code));
-        target = [...blocks].reverse().find((b) => b.row <= t.r && fits(b)) || blocks.find(fits);
+        target = blocks.filter((b) => fits(b) && b.starts.some((s0) => s0 <= t.r)).sort((a, b) => Math.max(...b.starts.filter((s0) => s0 <= t.r)) - Math.max(...a.starts.filter((s0) => s0 <= t.r)))[0] || blocks.find(fits);
       }
       target = target || blockAt(t.r);
       if (target) target.tasks.push(t.text);

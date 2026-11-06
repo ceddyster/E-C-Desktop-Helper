@@ -83,6 +83,7 @@ Download the week's TL workbook (Excel for the web: *File → Create a Copy → 
 - The **date** comes from the top-right cell (e.g. "Monday, October 26, 2026"). If that cell is empty, it uses the day in the tab name plus the week in the file name (`TL 26.10.2026-1.11.2026`).
 - The **manager** comes from the MANAGER cell.
 - **Bold Duties text is an event name.** Everyone listed below it, up to the next bold entry, works that event. The **Bar** column cross-checks this: a person whose bar belongs to an earlier event joins that one, and a bar with no event (e.g. `SET UP`) becomes its own team. Bold is read straight from the workbook's formatting (`js/xlsxfmt.js`). If formatting can't be read, event names are guessed and the review window says so.
+- **The same event name written again** (on every row, further down the tab, or on another bar tab for the same day) continues that one event rather than starting a new one.
 - **Non-bold Duties text is the team's after-event jobs** ("GB1 - CLEAN & RESET FOR LGPA COCKTAIL"). Lines on consecutive rows are joined into one job. A job starting with a bar code goes to that bar's event; otherwise it goes to the event it sits under. Jobs show under **After the event** on the event.
 - **A row with a start time but no name** (the highlighted blanks) is an **unfilled spot**. Events show "⚠ 3 staff still needed (4:15pm CB)", the **On shift** list shows each one as a yellow **⚠ Unfilled** row (bar, event, start time), and the calendar shows a red "⚠ 3 missing" on that day.
 - Staff whose Start says `REJ` or `Cancelled` are left out, and the review window lists them.
@@ -109,6 +110,8 @@ A revised BEO with the same BEO# replaces the earlier version.
 - Extra words are fine: *REBECCA & PHIL WEDDING* matches *Rebecca & Phill's Wedding Reception*, and *PGA GALA DINNER* matches *(Inc) PGA Conference & Gala Dinner*.
 - At least one name word must match, so two weddings on the same day aren't mixed up.
 - The bar code is a tie-breaker: *AST3* ↔ *Astral 3*, *CB3* ↔ *Crown Ballroom 3*.
+- Initials count: *RMHC* matches *Ronald McDonald House Charities*, and *LGPA* matches *Ladies Golf Professional Association*. Numbers such as the year don't count as a name match.
+- Anyone listed on more than one event that day gets an **⚠ Also on: …** note in the day view.
 
 A TL duty with no matching BEO still shows, tagged *TL only · no matching BEO*, with a picker to link it to one of that day's BEOs by hand. Matched events show which TL duty they came from, with a **change** link to correct or undo a match. Manual choices are remembered.
 

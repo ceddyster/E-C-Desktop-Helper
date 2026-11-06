@@ -119,7 +119,20 @@
     const main = all.filter((e) => !e.fromTL).map((e) => Object.assign({}, e, { barStaff: [], barNotes: [], bars: [], tlDuties: [], missing: [], tasks: [] }));
     const beos = main.filter((b) => b.beo);
     const out = [...main];
-    const tl = all.filter((e) => e.fromTL);
+    // The same TL event name on two tabs (or written twice) for the same day is one event.
+    const tlByName = new Map();
+    for (const e of all.filter((x) => x.fromTL)) {
+      const k = `${e.kind || 'event'}|${M.key(e.title)}`;
+      const g = tlByName.get(k);
+      if (!g) { tlByName.set(k, Object.assign({}, e, { bars: [...(e.bars || [])], staffDetail: [...(e.staffDetail || [])], missing: [...(e.missing || [])], tasks: [...(e.tasks || [])] })); continue; }
+      for (const b of e.bars || []) if (!g.bars.includes(b)) g.bars.push(b);
+      for (const d of e.staffDetail || []) if (!g.staffDetail.some((x) => x.name === d.name && x.start === d.start)) g.staffDetail.push(d);
+      g.missing.push(...(e.missing || []));
+      for (const t of e.tasks || []) if (!g.tasks.includes(t)) g.tasks.push(t);
+      if (e.start && (!g.start || e.start < g.start)) g.start = e.start;
+      g.notes = [g.notes, e.notes].filter(Boolean).join(' · ');
+    }
+    const tl = [...tlByName.values()];
     const choice = new Map();
     for (const t of tl) {
       const manual = (state.links || {})[linkKey(iso, t.title)];
@@ -216,7 +229,10 @@
 
     const evs = eventsOn(iso);
     // Each event is a row: event details on the left, the people working it (and unfilled spots) on the right.
-    const rows = evs.map((e) => `<li class="day-row"><div class="day-ev">${eventCard(e)}</div>${staffColumn(e)}</li>`);
+    // Who is on more than one event today (e.g. listed on two bar tabs at the same time).
+    const onEvents = new Map();
+    for (const e of evs) for (const d of e.barStaff || []) { const k = d.name.toLowerCase(); if (!onEvents.has(k)) onEvents.set(k, new Set()); onEvents.get(k).add(e.title); }
+    const rows = evs.map((e) => `<li class="day-row"><div class="day-ev">${eventCard(e)}</div>${staffColumn(e, onEvents)}</li>`);
     // Shifts that don't belong to any event shown (e.g. from a plain roster) go in a last row.
     const placed = new Set(dayEvents(iso).flatMap((e) => (e.barStaff || []).map((d) => `${d.name}|${d.start}`)));
     const other = shiftsOn(iso).filter((x) => !placed.has(`${x.person}|${x.start}`) && (!view.onlyMine || isMe(x.person)));
@@ -231,17 +247,20 @@
       <span class="who"><span class="blank-name">Unfilled</span>${p.bar ? ` <span class="muted small">Bar · ${esc(p.bar)}</span>` : ''}${p.sub ? `<br><span class="muted small">${esc(p.sub)}</span>` : ''}</span>
       <span class="when">${p.start ? fmtTime(p.start) : ''}</span></li>`;
     return `<li class="${isMe(p.name) ? 'mine' : ''}">
-      <span class="who">${esc(p.name)}${p.bar ? ` <span class="muted small">Bar · ${esc(p.bar)}</span>` : ''}${p.sub ? `<br><span class="muted small">${esc(p.sub)}</span>` : ''}</span>
+      <span class="who">${esc(p.name)}${p.bar ? ` <span class="muted small">Bar · ${esc(p.bar)}</span>` : ''}${p.sub ? `<br><span class="muted small">${esc(p.sub)}</span>` : ''}${p.also && p.also.length ? `<br><span class="also">⚠ Also on: ${esc(p.also.join(', '))}</span>` : ''}</span>
       <span class="when">${p.start ? `${fmtTime(p.start)}${p.end ? '–' + fmtTime(p.end) : ''}` : esc(p.label || '')}</span></li>`;
   }
 
   /** The right-hand column for an event: its staff and unfilled spots, in start-time order. */
-  function staffColumn(e) {
+  function staffColumn(e, onEvents) {
     // Name the TL group under each person only when the event has more than one (e.g. main bar, BIR, champagne).
     const multi = (e.tlDuties || []).length > 1;
     const same = (d) => !d || !multi && !e.noBEO ? true : M.key(d) === M.key(e.title);
     const people = e.barStaff && (e.barStaff.length || e.beo || e.fromTL || (e.missing || []).length)
-      ? e.barStaff.map((d) => ({ name: d.name, start: d.start, bar: d.bar, sub: same(d.duty) ? '' : d.duty }))
+      ? e.barStaff.map((d) => {
+        const others = onEvents ? [...(onEvents.get(d.name.toLowerCase()) || [])].filter((t) => t !== e.title) : [];
+        return { name: d.name, start: d.start, bar: d.bar, sub: same(d.duty) ? '' : d.duty, also: others };
+      })
       : staffFor(e).map((n) => ({ name: n }));
     const gaps = (e.missing || []).map((m) => ({ gap: true, start: m.start, bar: m.bar, sub: same(m.duty) ? '' : m.duty }));
     const all = [...people, ...gaps].sort((a, b) => (a.start || '99').localeCompare(b.start || '99') || (a.gap ? 1 : 0) - (b.gap ? 1 : 0));
@@ -306,7 +325,7 @@
       <div>
         <div class="event-title">${esc(e.title)}${e.setup ? (/^set up team$/i.test(e.title) ? '' : ' <span class="tag">Set up team</span>') : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
         ${e.noBEO && e.beoChoices ? `<div class="event-meta">Is this one of today's BEOs? ${linkPicker(e.date, e.title, e.manualNone ? 'none' : '')}</div>` : ''}
-        ${e.nearest && e.nearest.beo ? `<div class="event-meta small">Closest BEO today: “${esc(e.nearest.beo.title)}” (${e.nearest.sc > 0 ? 'some words match, but not enough' : 'no name words in common'})</div>` : ''}
+        ${e.nearest && e.nearest.beo && e.nearest.sc > 0 ? `<div class="event-meta small">Closest BEO today: “${esc(e.nearest.beo.title)}” (${e.nearest.sc > 0 ? 'some words match, but not enough' : 'no name words in common'})</div>` : ''}
         ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : d.guess ? ' (best guess)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
         ${sub ? `<div class="event-meta">${sub}</div>` : ''}
         ${meta ? `<div class="event-meta">${meta}</div>` : ''}
@@ -554,7 +573,7 @@
   const F = window.CrownFolder;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 7;
+  const READER_VERSION = 8;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';

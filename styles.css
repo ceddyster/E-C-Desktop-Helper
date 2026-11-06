@@ -340,3 +340,4 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .cons-table tbody tr { cursor: pointer; }
 .cons-table tbody tr:hover { background: var(--surface-2); }
 .cons-table tfoot td { font-weight: 700; border-top: 2px solid var(--border); }
+.also { color: var(--danger); font-size: .78rem; font-weight: 600; }
