@@ -6,7 +6,7 @@
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   /* ---------- State ---------- */
-  let state = { sources: [], events: [], shifts: [], myName: '', keepMonths: 3 };
+  let state = { sources: [], events: [], shifts: [], myName: '', keepMonths: 3, consKeepMonths: 12 };
   const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), weekStart: null, onlyMine: false, calMode: 'shifts', calRange: 'week' };
 
   function load() {
@@ -17,12 +17,24 @@
     try { view.calRange = localStorage.getItem(STORE + '.calRange') || 'week'; } catch (_) {}
     view.weekStart = mondayOf(new Date());
     if (state.keepMonths == null) state.keepMonths = 3;
+    if (state.consKeepMonths == null) state.consKeepMonths = 12;
     if (pruneOld()) save();
   }
 
   /* Housekeeping: drop events and shifts dated more than `keepMonths` ago from the dashboard's own
    * storage (this browser only). Files and linked folders are never touched, and a file that's already
    * been read isn't read again just because its old events were cleared. Returns how many were removed. */
+  /* Bar consumption days are kept separately (IndexedDB) with their own period, default 12 months. */
+  function pruneCons() {
+    const months = +state.consKeepMonths;
+    if (!months) return 0;
+    const now = new Date();
+    const cutoff = P.isoOf(new Date(now.getFullYear(), now.getMonth() - months, now.getDate()));
+    const old = state.sources.filter((src) => src.cons && src.consDate && src.consDate < cutoff);
+    old.forEach((src) => removeSource(src.id, true));
+    return old.length;
+  }
+
   function pruneOld() {
     const months = +state.keepMonths;
     if (!months) return 0;
@@ -39,6 +51,7 @@
     for (const x of [...state.events, ...state.shifts]) count[x.source] = (count[x.source] || 0) + 1;
     state.sources = state.sources.filter((src) => !had.has(src.id) || count[src.id]);
     for (const src of state.sources) {
+      if (src.cons) continue;   // consumption days are counted separately
       src.events = state.events.filter((e) => e.source === src.id).length;
       src.shifts = state.shifts.filter((x) => x.source === src.id).length;
     }
@@ -382,6 +395,12 @@
       const week = name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*\(\d+\)\s*$/, '').trim();
       return { fileName: name, sheets, sourceId: 'src:tl:' + week.toLowerCase(), displayName: week, auto: true };
     }
+    if (first.isCons) {
+      // One consumption workbook per day: a re-saved copy of the same day replaces it.
+      const day = first.cons.date || name.toLowerCase();
+      return { fileName: name, sheets, sourceId: 'src:cons:' + day, auto: true, cons: first.cons,
+        displayName: `Bar consumption · ${first.cons.date ? fmtShort(first.cons.date) : name}` };
+    }
     if (first.isBEO && first.beoNumber) {
       // A revised BEO ("… (6).pdf") replaces the earlier version with the same BEO number.
       return { fileName: name, sheets, sourceId: 'src:beo:' + first.beoNumber, displayName: first.label, auto: true,
@@ -423,6 +442,13 @@
     const name = file.fileName + (sh.label ? ` › ${sh.label}` : '');
     if (sh.kind === 'ready') {
       const r = sh.ready;
+      if (sh.isCons) {
+        const c = sh.cons;
+        div.innerHTML = `<div class="imp-head"><strong>${esc(name)}</strong><span class="muted small">${c.date ? fmtLong(c.date) : 'date not found'}</span></div>
+          <div class="preview"><table><tr><th>Event</th><th>BEO</th><th>Pax</th><th>Bars</th><th>Units used</th><th>Bev revenue</th><th>Bev cost</th></tr>${c.events.map((e) =>
+            `<tr><td>${esc(e.event)}</td><td>${esc(e.beo)}</td><td>${e.pax || ''}</td><td>${esc(e.bars.join(', '))}</td><td>${Math.round(e.units)}</td><td>${e.revenue ? '$' + Math.round(e.revenue).toLocaleString('en-AU') : '—'}</td><td>${e.cost ? '$' + Math.round(e.cost).toLocaleString('en-AU') : '—'}</td></tr>`).join('')}</table></div>${warn(sh.ready.warnings)}`;
+        return;
+      }
       div.innerHTML = `<div class="imp-head"><strong>${esc(name)}</strong><span class="muted small">${r.events.length} events, ${r.shifts.length} shifts</span></div>${previewTable(r)}${warn(r.warnings)}`;
       return;
     }
@@ -475,7 +501,7 @@
   /** Stores entries (replacing earlier data from the same source). Returns their dates, sorted. */
   function commitEntries(entries, quiet) {
     let ne = 0, ns = 0;
-    const dates = [];
+    const dates = [], consDays = [];
     for (const file of entries) {
       const id = file.sourceId || 'src:' + file.fileName.toLowerCase();
       // Two copies of the same BEO: keep the one printed most recently (its "Created" time), whatever
@@ -492,12 +518,21 @@
       events.forEach((e, i) => { e.id = `${id}#e${i}`; e.source = id; });
       shifts.forEach((s, i) => { s.id = `${id}#s${i}`; s.source = id; });
       state.events.push(...events); state.shifts.push(...shifts);
-      state.sources.push({ id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null, beoCreated: file.beoCreated || null });
+      const src = { id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null, beoCreated: file.beoCreated || null };
+      if (file.cons) {
+        // Consumption data lives in IndexedDB; the source entry just records it.
+        Object.assign(src, { cons: true, consDate: file.cons.date, events: file.cons.events.length, units: Math.round(file.cons.rows.reduce((a, x) => a + x.used, 0)) });
+        window.CrownConsUI.add(id, file.cons);
+        consDays.push(file.cons.date ? fmtShort(file.cons.date) : file.fileName);
+      }
+      state.sources.push(src);
       ne += events.length; ns += shifts.length;
       events.concat(shifts).forEach((x) => x.date && dates.push(x.date));
     }
+    pruneCons();
     const cleared = pruneOld();
-    if (!quiet) toast(`Imported ${ne} events and ${ns} shifts.${cleared ? ` ${cleared} older than ${state.keepMonths} month${+state.keepMonths === 1 ? '' : 's'} not kept.` : ''}`);
+    if (!quiet && consDays.length && !ne && !ns) toast(`Imported bar consumption for ${consDays.join(', ')}.`);
+    else if (!quiet) toast(`Imported ${ne} events and ${ns} shifts.${consDays.length ? ` Bar consumption: ${consDays.join(', ')}.` : ''}${cleared ? ` ${cleared} older than ${state.keepMonths} month${+state.keepMonths === 1 ? '' : 's'} not kept.` : ''}`);
     return dates.sort();
   }
 
@@ -632,10 +667,10 @@
             Object.assign(entry, { fromFolder: true, fileSaved: x.lastModified, path: x.path, wasSeen: st.seen[x.path] != null });
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
             st.files[x.path] = { status: 'loaded', saved: x.lastModified,
-              detail: entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
+              detail: entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
             batch.push(entry);
           } else {
-            st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet (no bar tabs) or BEO' };
+            st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO or consumption workbook' };
           }
           st.seen[x.path] = x.lastModified;
         } catch (e) {
@@ -676,7 +711,7 @@
     const panel = $('folderPanel');
     if (!panel) return;
     if (!F || !F.supported) { panel.innerHTML = '<p class="muted small">Linking a folder needs Microsoft Edge or Google Chrome.</p>'; return; }
-    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet or BEO', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
+    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet, BEO or consumption workbook', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
     const boxes = folders.map((f) => {
       const st = fstate(f.id);
       const files = Object.entries(st.files || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -729,6 +764,7 @@
   }
 
   function removeSource(id, silent) {
+    if (id.startsWith('src:cons:') && window.CrownConsUI) window.CrownConsUI.remove(id);
     state.sources = state.sources.filter((s) => s.id !== id);
     state.events = state.events.filter((e) => e.source !== id);
     state.shifts = state.shifts.filter((s) => s.source !== id);
@@ -740,7 +776,7 @@
   function renderSources() {
     renderFolder();
     $('sourceList').innerHTML = state.sources.length ? state.sources.map((s) => `<li>
-      <div><div>${esc(s.name)}</div><div class="meta">${s.events} events · ${s.shifts} shifts${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
+      <div><div>${esc(s.name)}</div><div class="meta">${s.cons ? `${s.events} events · ${(s.units || 0).toLocaleString('en-AU')} units used` : `${s.events} events · ${s.shifts} shifts`}${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
       : '<li class="empty">No documents loaded.</li>';
   }
@@ -804,15 +840,19 @@
     $('btnClear').onclick = () => {
       if (!confirm('Remove all loaded documents from this dashboard?')) return;
       state.sources = []; state.events = []; state.shifts = [];
+      if (window.CrownConsUI) window.CrownConsUI.clear();
       for (const st of Object.values(state.folders || {})) { st.seen = {}; st.files = {}; }   // next folder check reloads everything
       save(); render(); renderSources();
     };
     $('btnSample').onclick = loadSample;
 
-    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('settingsDlg').showModal(); };
+    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('consKeepMonths').value = String(state.consKeepMonths); $('settingsDlg').showModal(); };
     $('btnSaveSettings').onclick = () => {
       state.myName = $('myName').value.trim();
       state.keepMonths = +$('keepMonths').value;
+      state.consKeepMonths = +$('consKeepMonths').value;
+      const clearedDays = pruneCons();
+      if (clearedDays) toast(`Cleared ${clearedDays} day${clearedDays === 1 ? '' : 's'} of bar consumption older than ${state.consKeepMonths} months. Your files weren't touched.`);
       const cleared = pruneOld();
       save(); render();
       if (cleared) toast(`Cleared ${cleared} events and shifts older than ${state.keepMonths} month${state.keepMonths === 1 ? '' : 's'}. Your files weren't touched.`);
@@ -891,10 +931,19 @@
 
     // Roll over to the new day if the page is left open overnight.
     let lastDay = todayISO();
-    setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; if (pruneOld()) save(); render(); } }, 60000);
+    setInterval(() => { const t = todayISO(); if (t !== lastDay) { if (view.selected === lastDay) view.selected = t; lastDay = t; if (pruneOld() + pruneCons()) save(); render(); } }, 60000);
   }
 
   load(); wire(); render(); initFolder();
+  // Bar consumption add-on: totals window + panel. Days without a matching document entry are tidied away.
+  if (window.CrownConsUI) {
+    window.CrownConsUI.wire({ toast });
+    window.CrownConsUI.load().then(() => {
+      const known = new Set(state.sources.map((x) => x.id));
+      for (const id of Object.keys(window.CrownConsUI.days())) if (!known.has(id)) window.CrownConsUI.remove(id);
+      if (pruneCons()) save();
+    });
+  }
   // Test hook: lets automated tests link a folder handle without the native picker.
   window.__crownTestLinkFolder = async (h) => {
     const id = 't' + folders.length; folders.push({ id, handle: h, perm: 'granted' });

@@ -6,7 +6,8 @@ The main page is a one-page summary made of small windows. Click a window to ope
 
 - **Today**: each event's name, the bar staff working it, and the time each person starts. Click it for the full day view: one row per event, with the event details (BEO, function times, beverage, after-event jobs) on the left and the people working it (plus any unfilled spots) on the right. Use ‹ / › to move between days.
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
-- **4 empty add-on slots** for future features.
+- **Bar consumption**: this week's units used, beverage revenue, cost and cost %, plus the most-used products. Click it for the totals panel (see below).
+- **3 empty add-on slots** for future features.
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.
 
@@ -53,6 +54,24 @@ Click **📁 Link folder** and choose a folder where TL Sheets or BEOs are saved
 This needs Microsoft Edge or Google Chrome. The browser may ask for permission again after it restarts: click **📁 Reconnect** in the header, or choose "Allow on every visit" when it asks.
 
 **Which copy of a BEO is used:** if there are several copies of the same BEO (same BEO#), the one with the latest **"Created:"** time in its header is kept, wherever and whenever the files turn up. An older printout downloaded later is listed under *Older BEO copies (ignored)* and doesn't replace the newer one. Deleting the PDF afterwards doesn't remove it from the dashboard.
+
+### Bar consumption workbooks → totals
+
+Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **Documents → Link another folder**, or load one with **Load documents**. They're recognised by the "Banquet Consumption Report" blocks (`js/consumption.js`):
+
+- **Each event tab:** the event details are read (BEO #, date, name, pax, room, event type, event / service manager, DM), plus every product used in each **bar block** (bar name, category, size, opening, transfer, closing, used, charge, cost).
+- **The Total block:** gives each event's official beverage revenue, cost and cost %. These are the same figures as the workbook's Summary tab.
+- **Empty tabs** (Event 5…15 etc.) are skipped. A re-saved copy of the same day replaces the earlier one.
+- **Big workbooks are slimmed first:** drawings, buttons and macros are left out, so a 5 MB / 48 MB-unpacked workbook reads in about a second (`js/slimzip.js`). The file itself isn't changed.
+
+Click the **Bar consumption** window for the totals panel:
+
+- **Period:** this/last week, this/last month, last 3 months, this year, everything, or custom dates.
+- **Total by:** product, category, bar, event, day, month, event type, event manager, service manager or room.
+- **Click a row** to filter to it and see its breakdown, e.g. Category → *Beer* → by product → *Peroni* → by event. Filters show as chips; × removes one.
+- **Search** product, event or bar names. **Click a heading** to sort. **Export CSV** saves the current table.
+
+Consumption data is kept in the browser's IndexedDB, separately from events. It's kept for **12 months** by default; change this in ⚙︎ Settings.
 
 ### TL Sheet → bar team roster
 
@@ -120,6 +139,9 @@ js/app.js         dashboard, calendar, import review, storage
 js/tl.js          TL workbook reader (bar tabs → shifts)
 js/beo.js         BEO PDF reader (→ events)
 js/match.js       TL duty ↔ BEO name matching
+js/consumption.js reads bar consumption workbooks
+js/consui.js      bar consumption window + totals panel
+js/slimzip.js     makes big .xlsx/.xlsm files quick to read
 js/folder.js      linked-folder access (File System Access API)
 js/drive.js       optional Google Drive picker
 config.js         optional Google credentials

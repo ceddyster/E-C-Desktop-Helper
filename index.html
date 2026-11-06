@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-10-31k">
+  <link rel="stylesheet" href="styles.css?v=2026-11-06b">
 </head>
 <body>
   <header class="topbar">
@@ -53,7 +53,17 @@
     </section>
 
     <!-- PLACEHOLDERS -->
-    <section class="card placeholder"><span>Add-on slot 1</span></section>
+    <!-- BAR CONSUMPTION (compact) -->
+    <section class="card win" id="consWin" tabindex="0" role="button" aria-label="Open bar consumption totals">
+      <div class="win-head">
+        <div>
+          <h2>Bar consumption</h2>
+          <p class="muted small" id="consWinSub"></p>
+        </div>
+        <span class="win-open" aria-hidden="true">Totals ›</span>
+      </div>
+      <div id="consWinBody"></div>
+    </section>
     <section class="card placeholder"><span>Add-on slot 2</span></section>
     <section class="card placeholder"><span>Add-on slot 3</span></section>
     <section class="card placeholder"><span>Add-on slot 4</span></section>
@@ -113,6 +123,47 @@
     </div>
   </dialog>
 
+  <!-- BAR CONSUMPTION DETAIL -->
+  <dialog id="consDlg" class="dlg panel" aria-labelledby="consTitle">
+    <div class="dlg-inner">
+      <div class="card-head">
+        <div>
+          <h2 id="consTitle">Bar consumption totals</h2>
+          <p class="muted small" id="consRange"></p>
+        </div>
+        <div class="seg">
+          <button class="btn sm" type="button" id="consExport">Export CSV</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="cons-controls">
+        <label>Period
+          <select id="consPeriod">
+            <option value="thisWeek">This week</option>
+            <option value="lastWeek">Last week</option>
+            <option value="thisMonth">This month</option>
+            <option value="lastMonth">Last month</option>
+            <option value="last3">Last 3 months</option>
+            <option value="thisYear">This year</option>
+            <option value="all">Everything loaded</option>
+            <option value="custom">Custom dates…</option>
+          </select>
+        </label>
+        <span id="consCustom" hidden>
+          <label>From <input type="date" id="consFrom"></label>
+          <label>To <input type="date" id="consTo"></label>
+        </span>
+        <label>Total by <select id="consGroup"></select></label>
+        <label class="grow">Search <input type="text" id="consSearch" placeholder="Product, event, bar…"></label>
+      </div>
+      <div class="cons-chips" id="consChips"></div>
+      <div class="kpis wide" id="consCards"></div>
+      <p class="muted small">Click a row to show only that item, then see its breakdown. Click a heading to sort.</p>
+      <div class="cons-table" id="consTable"></div>
+      <p class="muted small" id="consNote"></p>
+    </div>
+  </dialog>
+
   <!-- IMPORT REVIEW -->
   <dialog id="importDlg" class="dlg wide">
     <form method="dialog" class="dlg-inner">
@@ -167,6 +218,15 @@
         </select>
       </label>
       <p class="muted small">Older ones are cleared from the dashboard automatically to save space. Your files and folders are never touched.</p>
+      <label class="field">Keep bar consumption data for
+        <select id="consKeepMonths">
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="12">12 months</option>
+          <option value="24">2 years</option>
+          <option value="0">Forever</option>
+        </select>
+      </label>
       <div class="dlg-foot">
         <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
       </div>
@@ -194,15 +254,18 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-10-31k"></script>
-  <script src="config.js?v=2026-10-31k"></script>
-  <script src="js/parse.js?v=2026-10-31k"></script>
-  <script src="js/xlsxfmt.js?v=2026-10-31k"></script>
-  <script src="js/tl.js?v=2026-10-31k"></script>
-  <script src="js/beo.js?v=2026-10-31k"></script>
-  <script src="js/folder.js?v=2026-10-31k"></script>
-  <script src="js/match.js?v=2026-10-31k"></script>
-  <script src="js/drive.js?v=2026-10-31k"></script>
-  <script src="js/app.js?v=2026-10-31k"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-06b"></script>
+  <script src="config.js?v=2026-11-06b"></script>
+  <script src="js/slimzip.js?v=2026-11-06b"></script>
+  <script src="js/parse.js?v=2026-11-06b"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-06b"></script>
+  <script src="js/tl.js?v=2026-11-06b"></script>
+  <script src="js/beo.js?v=2026-11-06b"></script>
+  <script src="js/folder.js?v=2026-11-06b"></script>
+  <script src="js/match.js?v=2026-11-06b"></script>
+  <script src="js/consumption.js?v=2026-11-06b"></script>
+  <script src="js/consui.js?v=2026-11-06b"></script>
+  <script src="js/drive.js?v=2026-11-06b"></script>
+  <script src="js/app.js?v=2026-11-06b"></script>
 </body>
 </html>

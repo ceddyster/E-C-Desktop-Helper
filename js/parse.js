@@ -275,6 +275,8 @@
 
   async function readSpreadsheet(name, buf) {
     if (!global.XLSX) throw new Error('Spreadsheet library failed to load.');
+    // Big workbooks full of drawings/buttons: drop those parts first so reading takes seconds, not minutes.
+    if (global.CrownSlim && /\.(xlsx|xlsm|xlsb)$/i.test(name)) buf = await global.CrownSlim.slim(buf);
     // CSVs are read as plain text so "3/11/2026" stays day-first (SheetJS would read it as US m/d).
     const isText = /\.(csv|tsv|txt)$/i.test(name);
     if (!isText && global.CrownTL) {
@@ -291,6 +293,17 @@
       }
       if (/(^|[^a-z])tl([^a-z]|$)/i.test(name)) {
         throw new Error(`looks like a TL Sheet but has no bar tabs. Tabs: ${names.slice(0, 15).join(', ')}${names.length > 15 ? '…' : ''}`);
+      }
+    }
+    if (!isText && global.CrownCons) {
+      // Banquet consumption workbooks: recognised from row 1 ("Banquet Consumption Report").
+      const peek = global.XLSX.read(buf, { type: 'array', sheetRows: 1 });
+      if (global.CrownCons.isConsumptionWorkbook(peek)) {
+        const data = global.CrownCons.read(global.XLSX.read(buf, { type: 'array', cellDates: true }), name);
+        const units = data.rows.reduce((s, x) => s + x.used, 0);
+        return [{ label: `Bar consumption · ${data.events.length} event${data.events.length === 1 ? '' : 's'} · ${Math.round(units)} units`,
+          kind: 'ready', isCons: true, cons: data,
+          ready: { events: [], shifts: [], warnings: data.date ? [] : ['Couldn\'t find the date in this workbook.'] } }];
       }
     }
     const wb = global.XLSX.read(buf, isText ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
