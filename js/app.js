@@ -679,7 +679,7 @@
             Object.assign(entry, { fromFolder: true, fileSaved: x.lastModified, path: x.path, wasSeen: st.seen[x.path] != null });
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
             st.files[x.path] = { status: 'loaded', saved: x.lastModified,
-              detail: entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
+              detail: entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units${(entry.cons.warnings || []).length ? ' · ⚠ ' + entry.cons.warnings.join(' ') : ''}` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
             batch.push(entry);
           } else {
             st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO or consumption workbook' };

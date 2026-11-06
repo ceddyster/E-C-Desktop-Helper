@@ -104,7 +104,7 @@
 
   /** Parses a consumption workbook → { date, events: [...], rows: [...] }. */
   function read(wb, fileName) {
-    const events = [], rows = [];
+    const events = [], rows = [], warnings = [];
     let wbDate = '';
     for (const sn of wb.SheetNames) {
       const ws = wb.Sheets[sn]; if (!ws || !ws['!ref']) continue;
@@ -137,6 +137,13 @@
       });
       // No bar blocks filled in, but the Total block has figures: use it.
       if (!evRows.length && totalCol) evRows = readBlock(c, totalCol).map((x) => Object.assign(x, { bar: 'Total' }));
+      // Cross-check: the bar blocks should add up to the Total block (the workbook sums them itself).
+      // A difference means something was filled in somewhere we didn't read.
+      if (totalCol && evRows.length && evRows[0].bar !== 'Total') {
+        const tUnits = readBlock(c, totalCol).reduce((s, x) => s + x.used, 0);
+        const bUnits = evRows.reduce((s, x) => s + x.used, 0);
+        if (Math.abs(tUnits - bUnits) > 0.5) warnings.push(`${sn.trim()}: the bar sections add up to ${Math.round(bUnits)} units but the Total section says ${Math.round(tUnits)}. Something may be filled in outside the usual layout.`);
+      }
       const t = totalCol ? totals(c, totalCol) : {};
       Object.assign(ev, {
         revenue: t.revenue || t.pkgRev || 0, onCons: t.onCons || 0, cost: t.cost != null ? t.cost : evRows.reduce((s, x) => s + x.cost, 0),
@@ -150,7 +157,7 @@
     }
     if (!wbDate) wbDate = events.map((e) => e.date).filter(Boolean).sort()[0] || '';
     events.forEach((e) => { if (!e.date) e.date = wbDate; });
-    return { date: wbDate, file: fileName, events, rows };
+    return { date: wbDate, file: fileName, events, rows, warnings };
   }
 
   /* ---------- Storage (IndexedDB, one record per day) ---------- */

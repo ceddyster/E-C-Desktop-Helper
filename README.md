@@ -61,6 +61,8 @@ Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **
 
 - **Each event tab:** the event details are read (BEO #, date, name, pax, room, event type, event / service manager, DM), plus every product used in each **bar block** (bar name, category, size, opening, transfer, closing, used, charge, cost).
 - **The Total block:** gives each event's official beverage revenue, cost and cost %. These are the same figures as the workbook's Summary tab.
+- **Every consumption area is read:** all four bar blocks on each event tab, both Menu Tasting blocks, and the Internal Cost Transfer tabs. A filled-in block with no bar name is listed as "Bar 1", "Bar 2"… by position.
+- **Cross-check:** for each event, the units read from the bar blocks are compared with the workbook's own Total block. Any difference is flagged in the review window and the folder's file list.
 - **Empty tabs** (Event 5…15 etc.) are skipped. A re-saved copy of the same day replaces the earlier one.
 - **Big workbooks are slimmed first:** drawings, buttons and macros are left out, so a 5 MB / 48 MB-unpacked workbook reads in about a second (`js/slimzip.js`). The file itself isn't changed.
 

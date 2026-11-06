@@ -303,7 +303,7 @@
         const units = data.rows.reduce((s, x) => s + x.used, 0);
         return [{ label: `Bar consumption · ${data.events.length} event${data.events.length === 1 ? '' : 's'} · ${Math.round(units)} units`,
           kind: 'ready', isCons: true, cons: data,
-          ready: { events: [], shifts: [], warnings: data.date ? [] : ['Couldn\'t find the date in this workbook.'] } }];
+          ready: { events: [], shifts: [], warnings: (data.date ? [] : ['Couldn\'t find the date in this workbook.']).concat(data.warnings || []) } }];
       }
     }
     const wb = global.XLSX.read(buf, isText ? { type: 'array', raw: true } : { type: 'array', cellDates: true });
