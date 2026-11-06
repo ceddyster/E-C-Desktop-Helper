@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-06b">
+  <link rel="stylesheet" href="styles.css?v=2026-11-06c">
 </head>
 <body>
   <header class="topbar">
@@ -144,7 +144,9 @@
             <option value="thisMonth">This month</option>
             <option value="lastMonth">Last month</option>
             <option value="last3">Last 3 months</option>
-            <option value="thisYear">This year</option>
+            <option value="thisFY">This financial year</option>
+            <option value="lastFY">Last financial year</option>
+            <option value="thisYear">This calendar year</option>
             <option value="all">Everything loaded</option>
             <option value="custom">Custom dates…</option>
           </select>
@@ -219,14 +221,15 @@
       </label>
       <p class="muted small">Older ones are cleared from the dashboard automatically to save space. Your files and folders are never touched.</p>
       <label class="field">Keep bar consumption data for
-        <select id="consKeepMonths">
-          <option value="3">3 months</option>
-          <option value="6">6 months</option>
+        <select id="consKeep">
+          <option value="fy2">This and last financial year</option>
+          <option value="fy3">Last three financial years</option>
           <option value="12">12 months</option>
           <option value="24">2 years</option>
           <option value="0">Forever</option>
         </select>
       </label>
+      <p class="muted small" id="consKeepNote"></p>
       <div class="dlg-foot">
         <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
       </div>
@@ -254,18 +257,18 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-06b"></script>
-  <script src="config.js?v=2026-11-06b"></script>
-  <script src="js/slimzip.js?v=2026-11-06b"></script>
-  <script src="js/parse.js?v=2026-11-06b"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-06b"></script>
-  <script src="js/tl.js?v=2026-11-06b"></script>
-  <script src="js/beo.js?v=2026-11-06b"></script>
-  <script src="js/folder.js?v=2026-11-06b"></script>
-  <script src="js/match.js?v=2026-11-06b"></script>
-  <script src="js/consumption.js?v=2026-11-06b"></script>
-  <script src="js/consui.js?v=2026-11-06b"></script>
-  <script src="js/drive.js?v=2026-11-06b"></script>
-  <script src="js/app.js?v=2026-11-06b"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-06c"></script>
+  <script src="config.js?v=2026-11-06c"></script>
+  <script src="js/slimzip.js?v=2026-11-06c"></script>
+  <script src="js/parse.js?v=2026-11-06c"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-06c"></script>
+  <script src="js/tl.js?v=2026-11-06c"></script>
+  <script src="js/beo.js?v=2026-11-06c"></script>
+  <script src="js/folder.js?v=2026-11-06c"></script>
+  <script src="js/match.js?v=2026-11-06c"></script>
+  <script src="js/consumption.js?v=2026-11-06c"></script>
+  <script src="js/consui.js?v=2026-11-06c"></script>
+  <script src="js/drive.js?v=2026-11-06c"></script>
+  <script src="js/app.js?v=2026-11-06c"></script>
 </body>
 </html>

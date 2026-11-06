@@ -11,6 +11,7 @@
   const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
   const fmtDay = (iso) => (iso ? parseISO(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '—');
+  const fmtDayY = (iso) => parseISO(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   const money = (n) => (n == null || !isFinite(n) ? '—' : n.toLocaleString('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }));
   const int = (n) => Math.round(n || 0).toLocaleString('en-AU');
   const pct = (n) => (n == null || !isFinite(n) ? '—' : `${(n * 100).toFixed(1)}%`);
@@ -50,6 +51,8 @@
       case 'thisMonth': return [isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0))];
       case 'lastMonth': return [isoOf(new Date(t.getFullYear(), t.getMonth() - 1, 1)), isoOf(new Date(t.getFullYear(), t.getMonth(), 0))];
       case 'last3': return [isoOf(new Date(t.getFullYear(), t.getMonth() - 3, t.getDate())), isoOf(t)];
+      case 'thisFY': { const y = t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1; return [`${y}-07-01`, `${y + 1}-06-30`]; }
+      case 'lastFY': { const y = (t.getMonth() >= 6 ? t.getFullYear() : t.getFullYear() - 1) - 1; return [`${y}-07-01`, `${y + 1}-06-30`]; }
       case 'thisYear': return [`${t.getFullYear()}-01-01`, `${t.getFullYear()}-12-31`];
       case 'custom': return [ui.from || '0000-01-01', ui.to || '9999-12-31'];
       default: return ['0000-01-01', '9999-12-31'];
@@ -64,6 +67,7 @@
     bar: { label: 'Bar', row: true, key: (r) => r.bar, next: 'product' },
     event: { label: 'Event', key: (e) => `${e.event} · ${fmtDay(e.date)}`, next: 'product' },
     day: { label: 'Day', key: (e) => e.date, show: fmtDay, next: 'event' },
+    fy: { label: 'Financial year', key: (e) => { const [y, m] = (e.date || '0-0').split('-').map(Number); const s = m >= 7 ? y : y - 1; return `FY ${s}–${String(s + 1).slice(2)}`; }, next: 'month' },
     month: { label: 'Month', key: (e) => (e.date || '').slice(0, 7), show: (k) => (k ? parseISO(k + '-01').toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }) : '—'), next: 'event' },
     type: { label: 'Event type', key: (e) => e.type || '—', next: 'event' },
     em: { label: 'Event manager', key: (e) => e.em || '—', next: 'event' },
@@ -107,7 +111,7 @@
       ? [['units', 'Units used'], ['pax', 'Pax'], ['revenue', 'Bev revenue (ex GST)'], ['cost', 'Bev cost'], ['pct', 'Cost %'], ['events', 'Events']]
       : [['units', 'Units used'], ['charge', 'On-consumption value (inc GST)'], ['cost', 'Cost'], ['events', 'Events']];
     let list = [...map.values()].map((x) => Object.assign(x, { events: x.ev.size, pct: x.revenue ? x.cost / x.revenue : null }));
-    const sort = ui.sort || (ui.group === 'day' || ui.group === 'month' ? { col: 'k', dir: 1 } : { col: eventLevel ? 'revenue' : 'units', dir: -1 });
+    const sort = ui.sort || (ui.group === 'day' || ui.group === 'month' || ui.group === 'fy' ? { col: 'k', dir: 1 } : { col: eventLevel ? 'revenue' : 'units', dir: -1 });
     list.sort((a, b) => { const va = a[sort.col], vb = b[sort.col]; return (typeof va === 'string' ? va.localeCompare(vb) : (va || 0) - (vb || 0)) * sort.dir; });
     return { cols, list, eventLevel, sort };
   }
@@ -150,7 +154,7 @@
     $('consCustom').hidden = ui.period !== 'custom';
     const sel = select(); const s = summarise(sel);
     $('consRange').textContent = ui.period === 'all' ? 'All loaded days'
-      : `${sel.from.startsWith('0000') ? '…' : fmtDay(sel.from)} – ${sel.to.startsWith('9999') ? '…' : fmtDay(sel.to)}`;
+      : `${sel.from.startsWith('0000') ? '…' : fmtDayY(sel.from)} – ${sel.to.startsWith('9999') ? '…' : fmtDayY(sel.to)}`;
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
     $('consCards').innerHTML = (sel.rowFiltered

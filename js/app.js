@@ -6,7 +6,7 @@
   const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   /* ---------- State ---------- */
-  let state = { sources: [], events: [], shifts: [], myName: '', keepMonths: 3, consKeepMonths: 12 };
+  let state = { sources: [], events: [], shifts: [], myName: '', keepMonths: 3, consKeep: 'fy2' };
   const view = { selected: P.isoOf(new Date()), month: firstOfMonth(new Date()), weekStart: null, onlyMine: false, calMode: 'shifts', calRange: 'week' };
 
   function load() {
@@ -17,19 +17,31 @@
     try { view.calRange = localStorage.getItem(STORE + '.calRange') || 'week'; } catch (_) {}
     view.weekStart = mondayOf(new Date());
     if (state.keepMonths == null) state.keepMonths = 3;
-    if (state.consKeepMonths == null) state.consKeepMonths = 12;
+    // Bar consumption: keep this and last financial year by default (replaces the earlier 12-month default).
+    if (state.consKeep == null) state.consKeep = 'fy2';
+    delete state.consKeepMonths;
     if (pruneOld()) save();
   }
 
   /* Housekeeping: drop events and shifts dated more than `keepMonths` ago from the dashboard's own
    * storage (this browser only). Files and linked folders are never touched, and a file that's already
    * been read isn't read again just because its old events were cleared. Returns how many were removed. */
-  /* Bar consumption days are kept separately (IndexedDB) with their own period, default 12 months. */
-  function pruneCons() {
-    const months = +state.consKeepMonths;
-    if (!months) return 0;
+  /* Bar consumption days are kept separately (IndexedDB) with their own period.
+   * 'fy2' = this and last financial year (1 July – 30 June), 'fy3' = three, a number = months, 0 = forever. */
+  function consCutoff(keep) {
     const now = new Date();
-    const cutoff = P.isoOf(new Date(now.getFullYear(), now.getMonth() - months, now.getDate()));
+    const m = String(keep).match(/^fy(\d)$/);
+    if (m) {
+      const fyStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;   // July = month 6
+      return `${fyStart - (+m[1] - 1)}-07-01`;
+    }
+    const months = +keep;
+    return months ? P.isoOf(new Date(now.getFullYear(), now.getMonth() - months, now.getDate())) : '';
+  }
+  const consKeepLabel = (k) => ({ fy2: 'this and last financial year', fy3: 'the last three financial years', 0: 'forever' }[k] || `${k} months`);
+  function pruneCons() {
+    const cutoff = consCutoff(state.consKeep);
+    if (!cutoff) return 0;
     const old = state.sources.filter((src) => src.cons && src.consDate && src.consDate < cutoff);
     old.forEach((src) => removeSource(src.id, true));
     return old.length;
@@ -846,13 +858,13 @@
     };
     $('btnSample').onclick = loadSample;
 
-    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('consKeepMonths').value = String(state.consKeepMonths); $('settingsDlg').showModal(); };
+    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('consKeep').value = String(state.consKeep); $('consKeepNote').textContent = consCutoff(state.consKeep) ? `Currently keeping from ${fmtLong(consCutoff(state.consKeep))}.` : 'Kept forever.'; $('settingsDlg').showModal(); };
     $('btnSaveSettings').onclick = () => {
       state.myName = $('myName').value.trim();
       state.keepMonths = +$('keepMonths').value;
-      state.consKeepMonths = +$('consKeepMonths').value;
+      const ck = $('consKeep').value; state.consKeep = /^fy/.test(ck) ? ck : +ck;
       const clearedDays = pruneCons();
-      if (clearedDays) toast(`Cleared ${clearedDays} day${clearedDays === 1 ? '' : 's'} of bar consumption older than ${state.consKeepMonths} months. Your files weren't touched.`);
+      if (clearedDays) toast(`Cleared ${clearedDays} day${clearedDays === 1 ? '' : 's'} of bar consumption from before ${fmtLong(consCutoff(state.consKeep))} (keeping ${consKeepLabel(state.consKeep)}). Your files weren't touched.`);
       const cleared = pruneOld();
       save(); render();
       if (cleared) toast(`Cleared ${cleared} events and shifts older than ${state.keepMonths} month${state.keepMonths === 1 ? '' : 's'}. Your files weren't touched.`);
@@ -935,6 +947,8 @@
   }
 
   load(); wire(); render(); initFolder();
+  // Ask the browser to keep this site's saved data even when the disk is low (financial-year records).
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
   // Bar consumption add-on: totals window + panel. Days without a matching document entry are tidied away.
   if (window.CrownConsUI) {
     window.CrownConsUI.wire({ toast });

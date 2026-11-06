@@ -66,12 +66,12 @@ Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **
 
 Click the **Bar consumption** window for the totals panel:
 
-- **Period:** this/last week, this/last month, last 3 months, this year, everything, or custom dates.
-- **Total by:** product, category, bar, event, day, month, event type, event manager, service manager or room.
+- **Period:** this/last week, this/last month, last 3 months, this/last financial year, this calendar year, everything, or custom dates.
+- **Total by:** product, category, bar, event, day, month, financial year, event type, event manager, service manager or room.
 - **Click a row** to filter to it and see its breakdown, e.g. Category → *Beer* → by product → *Peroni* → by event. Filters show as chips; × removes one.
 - **Search** product, event or bar names. **Click a heading** to sort. **Export CSV** saves the current table.
 
-Consumption data is kept in the browser's IndexedDB, separately from events. It's kept for **12 months** by default; change this in ⚙︎ Settings.
+Consumption data is kept in the browser's IndexedDB, separately from events. By default it keeps **this and last financial year** (1 July – 30 June). For example, on 6 Nov 2026 it keeps everything from 1 Jul 2025; on 1 Jul 2027 FY 2025–26 drops off. Other options are in ⚙︎ Settings: three financial years, 12 months, 2 years or forever. The totals panel has **This / Last financial year** periods and a **Financial year** grouping. The dashboard asks the browser to keep this data even when disk space runs low. Because the workbooks stay in their folder, **Re-read all** can always rebuild the totals.
 
 ### TL Sheet → bar team roster
 
