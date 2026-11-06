@@ -121,7 +121,8 @@
     const out = [...main];
     // The same TL event name on two tabs (or written twice) for the same day is one event.
     const tlByName = new Map();
-    for (const e of all.filter((x) => x.fromTL)) {
+    const useSource = tlSourceFor(iso);
+    for (const e of all.filter((x) => x.fromTL && x.source === useSource)) {
       const k = `${e.kind || 'event'}|${M.key(e.title)}`;
       const g = tlByName.get(k);
       if (!g) { tlByName.set(k, Object.assign({}, e, { bars: [...(e.bars || [])], staffDetail: [...(e.staffDetail || [])], missing: [...(e.missing || [])], tasks: [...(e.tasks || [])] })); continue; }
@@ -157,7 +158,7 @@
         m.missing.push(...(t.missing || []));
         m.tasks.push(...(t.tasks || []));
         m.manager = m.manager || t.manager;
-        m.tlDuties.push({ duty: t.title, manual: !!manual, guess: !!guess });
+        m.tlDuties.push({ duty: t.title, manual: !!manual, guess: !!guess, from: tlFrom(t) });
       } else {
         out.push(Object.assign({}, t, { barStaff: (t.staffDetail || []).map((d) => Object.assign({ duty: t.title }, d)), barNotes: t.notes ? [t.notes] : [], missing: t.missing || [], tasks: t.tasks || [],
           noBEO: t.kind !== 'setup', setup: t.kind === 'setup', beoChoices: beos.length, manualNone: manual === 'none',
@@ -174,6 +175,11 @@
     const when = [...new Set(e.missing.map((m) => [m.start && fmtTime(m.start), m.bar].filter(Boolean).join(' ')).filter(Boolean))];
     return `⚠ ${n} staff still needed${when.length ? ` (${when.join(', ')})` : ''}`;
   }
+  /** "TL 2.11.2026-8.11.2026 › SAT-BAR" — which file and tab a TL entry was read from. */
+  function tlFrom(e) {
+    const src = state.sources.find((x) => x.id === e.source);
+    return `${src ? src.name : 'TL Sheet'}${e.sheet ? ' › ' + e.sheet : ''}`;
+  }
   function setLink(date, duty, value) {
     state.links = state.links || {};
     if (value === '') delete state.links[linkKey(date, duty)]; else state.links[linkKey(date, duty)] = value;
@@ -188,7 +194,18 @@
     </select>`;
   }
   function eventsOn(iso) { return dayEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e)); }
-  function shiftsOn(iso) { return state.shifts.filter((s) => s.date === iso).sort(byTime); }
+  /** Two TL files covering the same day (e.g. an old copy of the week): only the newest one counts for that day. */
+  function tlSourceFor(iso) {
+    const ids = new Set();
+    for (const x of state.events) if (x.date === iso && x.fromTL) ids.add(x.source);
+    for (const x of state.shifts) if (x.date === iso && x.source && x.source.startsWith('src:tl')) ids.add(x.source);
+    const time = (id) => { const sx = state.sources.find((y) => y.id === id); return sx ? (sx.fileSaved || Date.parse(sx.loadedAt) || 0) : 0; };
+    return [...ids].sort((a, b) => time(b) - time(a))[0];
+  }
+  function shiftsOn(iso) {
+    const tl = tlSourceFor(iso);
+    return state.shifts.filter((s) => s.date === iso && (!s.source || !s.source.startsWith('src:tl') || s.source === tl)).sort(byTime);
+  }
   function calShiftsOn(iso) { return shiftsOn(iso).filter((s) => !view.onlyMine || isMe(s.person)); }
   // "Leisly Tuesta Melendez" → "Leisly T." to fit calendar cells.
   const shortName = (n) => { const p = String(n).trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[1][0]}.` : p[0]; };
@@ -326,7 +343,8 @@
         <div class="event-title">${esc(e.title)}${e.setup ? (/^set up team$/i.test(e.title) ? '' : ' <span class="tag">Set up team</span>') : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
         ${e.noBEO && e.beoChoices ? `<div class="event-meta">Is this one of today's BEOs? ${linkPicker(e.date, e.title, e.manualNone ? 'none' : '')}</div>` : ''}
         ${e.nearest && e.nearest.beo && e.nearest.sc > 0 ? `<div class="event-meta small">Closest BEO today: “${esc(e.nearest.beo.title)}” (${e.nearest.sc > 0 ? 'some words match, but not enough' : 'no name words in common'})</div>` : ''}
-        ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `“${esc(d.duty)}”${d.manual ? ' (linked by you)' : d.guess ? ' (best guess)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
+        ${e.fromTL ? `<div class="event-meta small">From ${esc(tlFrom(e))}</div>` : ''}
+        ${e.tlDuties && e.tlDuties.length ? `<div class="event-meta tl-from">TL: ${e.tlDuties.map((d) => `<span title="From ${esc(d.from || '')}">“${esc(d.duty)}”</span>${d.manual ? ' (linked by you)' : d.guess ? ' (best guess)' : ''} <button class="linkbtn" type="button" data-change-link="${esc(d.duty)}" data-link-date="${esc(e.date)}">change</button>`).join(', ')}</div>` : ''}
         ${sub ? `<div class="event-meta">${sub}</div>` : ''}
         ${meta ? `<div class="event-meta">${meta}</div>` : ''}
         ${barLine ? `<div class="event-meta">${barLine}</div>` : ''}
@@ -573,7 +591,7 @@
   const F = window.CrownFolder;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 8;
+  const READER_VERSION = 9;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';

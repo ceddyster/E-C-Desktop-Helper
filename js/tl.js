@@ -66,9 +66,19 @@
         if (/^manager$/i.test(norm(row[c]))) manager = norm(row.slice(c + 1).find((x) => norm(x)) || '');
       }
     }
-    if (!date) {
-      const ws = weekStartFromName(fileName), dm = sheetName.toUpperCase().match(/\b(MON|TUE|WED|THU|FRI|SAT|SUN)/), day = dm ? DAYS.indexOf(dm[1]) : -1;
-      if (ws && day >= 0) { ws.setDate(ws.getDate() + day); date = P().isoOf(ws); }
+    // The day the tab name and the workbook's week point to (e.g. "SAT-BAR" in "TL 2.11.2026-8.11.2026" → 7 Nov).
+    const ws = weekStartFromName(fileName), dm = sheetName.toUpperCase().match(/\b(MON|TUE|WED|THU|FRI|SAT|SUN)/), day = dm ? DAYS.indexOf(dm[1]) : -1;
+    let tabDate = null;
+    if (ws && day >= 0) { const d = new Date(ws); d.setDate(d.getDate() + day); tabDate = P().isoOf(d); }
+    if (!date) date = tabDate;
+    else if (ws) {
+      // A date cell outside this workbook's week (e.g. a tab copied from last week, date not updated)
+      // would put the tab on the wrong day: trust the tab name + week instead.
+      const start = P().isoOf(ws), endD = new Date(ws); endD.setDate(endD.getDate() + 6);
+      if ((date < start || date > P().isoOf(endD)) && tabDate) {
+        warnings.push(`${sheetName}: its date cell says ${date}, which isn't in this workbook's week, so ${tabDate} (from the tab name) was used.`);
+        date = tabDate;
+      }
     }
     if (!date) return { events: [], shifts: [], warnings: [`${sheetName}: couldn't work out the date.`] };
 
