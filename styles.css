@@ -347,3 +347,12 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .rev-alert ul { margin: 6px 0 4px; padding-left: 18px; list-style: disc; }
 .rev-alert li { padding: 2px 0; }
 .rev-flag { color: var(--danger); font-size: .78rem; font-weight: 600; white-space: nowrap; }
+
+.rev-alert li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.rev-alert .btn.sm { padding: 2px 8px; font-size: .8rem; }
+.ok-form { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.ok-form input { font: inherit; font-size: .85rem; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); min-width: 260px; }
+.ok-list { margin-top: 8px; font-size: .85rem; }
+.ok-list summary { cursor: pointer; color: var(--mine); font-weight: 600; }
+.ok-list ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
+.ok-tag { color: var(--mine); font-size: .78rem; font-weight: 600; white-space: nowrap; }

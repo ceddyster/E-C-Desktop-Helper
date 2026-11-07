@@ -112,7 +112,7 @@
     const map = new Map();
     const get = (k) => map.get(k) || map.set(k, { k, units: 0, charge: 0, cost: 0, revenue: 0, pax: 0, ev: new Set() }).get(k);
     for (const r of sel.rows) { const x = get(keyOf(ui.group, r)); x.units += r.used; x.charge += r.chg; if (!eventLevel) x.cost += r.cost; x.ev.add(r.e.key); }
-    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); if (missingRevenue(e)) x.flag = (x.flag || 0) + 1; }
+    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); if (missingRevenue(e)) x.flag = (x.flag || 0) + 1; else if (noRevenue(e)) x.checked = true; }
     const cols = eventLevel
       ? [['units', 'Units used'], ['pax', 'Pax'], ['revenue', 'Bev revenue (ex GST)'], ['cost', 'Bev cost'], ['pct', 'Cost %'], ['events', 'Events']]
       : [['units', 'Units used'], ['charge', 'On-consumption value (inc GST)'], ['cost', 'Cost'], ['events', 'Events']];
@@ -123,7 +123,17 @@
   }
 
   /* Stock was used but no beverage revenue was entered in the report (e.g. a service manager missed it). */
-  const missingRevenue = (e) => (e.units > 0 || e.cost > 0) && !e.revenue;
+  // "Checked" events: $0 revenue confirmed as fine (e.g. revenue recorded on another event's tab for the same
+  // client). Remembered in this browser by date + BEO + event name, so re-reading the workbook keeps it.
+  const OK_KEY = 'crownDash.consRevenueOk';
+  let okMap = {};
+  try { okMap = JSON.parse(localStorage.getItem(OK_KEY) || '{}') || {}; } catch (_) { okMap = {}; }
+  const okId = (e) => `${e.date}|${String(e.beo || '').trim()}|${String(e.event || '').trim().toLowerCase()}`;
+  const saveOk = () => { try { localStorage.setItem(OK_KEY, JSON.stringify(okMap)); } catch (_) {} };
+  const noRevenue = (e) => (e.units > 0 || e.cost > 0) && !e.revenue;
+  const isChecked = (e) => !!okMap[okId(e)];
+  const missingRevenue = (e) => noRevenue(e) && !isChecked(e);
+  let editingOk = null;   // okId of the event whose note is being typed
   // "Charlie - TL Yulei" / "Ashleigh/ Richard TL: Caitlin" → "Charlie" / "Ashleigh/ Richard"
   const smOf = (e) => (e.sm ? e.sm.split(/\s+-\s+|\s*\bTL\b|:/i)[0].replace(/[\s\-\/]+$/, '').trim() : '');
 
@@ -171,9 +181,19 @@
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
     const missing = sel.events.filter(missingRevenue).sort((a, b) => a.date.localeCompare(b.date));
-    $('consAlerts').innerHTML = missing.length ? `<div class="rev-alert"><strong>⚠ ${missing.length} event${missing.length === 1 ? '' : 's'} used stock but ${missing.length === 1 ? 'has' : 'have'} no beverage revenue entered in the report</strong><ul>${missing.map((e) =>
-      `<li><b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''}</li>`).join('')}</ul>
-      <p class="muted small">Until the figures are entered in the workbook, revenue is understated and cost % overstated for this period. Once it's re-saved, the dashboard picks it up automatically.</p></div>` : '';
+    const checked = sel.events.filter((e) => noRevenue(e) && isChecked(e)).sort((a, b) => a.date.localeCompare(b.date));
+    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''}`;
+    const okForm = (e) => editingOk === okId(e)
+      ? `<span class="ok-form"><input type="text" data-ok-note placeholder="Where is the revenue? (optional) e.g. on the LGPA tab" maxlength="120">
+         <button class="btn sm primary" type="button" data-ok-save="${esc(okId(e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`
+      : `<button class="btn sm" type="button" data-ok-start="${esc(okId(e))}">✓ Mark as OK</button>`;
+    $('consAlerts').innerHTML = (missing.length ? `<div class="rev-alert"><strong>⚠ ${missing.length} event${missing.length === 1 ? '' : 's'} used stock but ${missing.length === 1 ? 'has' : 'have'} no beverage revenue entered in the report</strong><ul>${missing.map((e) =>
+      `<li>${line(e)} ${okForm(e)}</li>`).join('')}</ul>
+      <p class="muted small">Until the figures are entered in the workbook, revenue is understated and cost % overstated for this period. Once it's re-saved, the dashboard picks it up automatically. If the revenue is recorded elsewhere (e.g. on another event's tab for the same client), use <b>Mark as OK</b>.</p></div>` : '')
+      + (checked.length ? `<details class="ok-list"><summary>✓ ${checked.length} event${checked.length === 1 ? '' : 's'} with $0 revenue checked as OK</summary><ul>${checked.map((e) => {
+        const ok = okMap[okId(e)];
+        return `<li>${line(e)}${ok.note ? ` · <i>${esc(ok.note)}</i>` : ''} <span class="muted small">(checked ${esc(new Date(ok.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))})</span> <button class="linkbtn" type="button" data-ok-undo="${esc(okId(e))}">undo</button></li>`;
+      }).join('')}</ul></details>` : '');
     $('consCards').innerHTML = (sel.rowFiltered
       ? [['Units used', int(s.units)], ['On-consumption value', money(s.charge)], ['Cost', money(s.rowCost)], ['Events', int(s.events)]]
       : [['Events', int(s.events)], ['Pax', int(s.pax)], ['Units used', int(s.units)], ['Bev revenue (ex GST)', money(s.revenue)], ['Bev cost', money(s.cost)], ['Cost %', pct(s.costPct)], ['Revenue per head', money(s.perHead)]])
@@ -183,7 +203,7 @@
     const fmt = (c, x) => (c === 'units' || c === 'pax' || c === 'events' ? int(x[c]) : c === 'pct' ? pct(x[c]) : money(x[c]));
     const arrow = (c) => (t.sort.col === c ? (t.sort.dir > 0 ? ' ▲' : ' ▼') : '');
     $('consTable').innerHTML = t.list.length ? `<table><thead><tr><th data-sort="k">${esc(g.label)}${arrow('k')}</th>${t.cols.map(([c, l]) => `<th data-sort="${c}" class="n">${l}${arrow(c)}</th>`).join('')}</tr></thead>
-      <tbody>${t.list.map((x) => `<tr data-drill="${esc(x.k)}" title="Show only ${esc(g.show ? g.show(x.k) : x.k)}"><td>${esc(g.show ? g.show(x.k) : x.k)}${x.flag ? ` <span class="rev-flag" title="Stock used but no beverage revenue entered">⚠ no revenue entered${ui.group === 'event' ? '' : ` (${x.flag})`}</span>` : ''}</td>${t.cols.map(([c]) => `<td class="n">${fmt(c, x)}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tbody>${t.list.map((x) => `<tr data-drill="${esc(x.k)}" title="Show only ${esc(g.show ? g.show(x.k) : x.k)}"><td>${esc(g.show ? g.show(x.k) : x.k)}${x.flag ? ` <span class="rev-flag" title="Stock used but no beverage revenue entered">⚠ no revenue entered${ui.group === 'event' ? '' : ` (${x.flag})`}</span>` : x.checked && ui.group === 'event' ? ' <span class="ok-tag" title="$0 revenue checked as OK">✓ revenue elsewhere</span>' : ''}</td>${t.cols.map(([c]) => `<td class="n">${fmt(c, x)}</td>`).join('')}</tr>`).join('')}</tbody>
       <tfoot><tr><td>Total</td>${t.cols.map(([c]) => `<td class="n">${c === 'pct' ? pct(t.list.reduce((a, x) => a + x.cost, 0) / (t.list.reduce((a, x) => a + x.revenue, 0) || NaN)) : c === 'events' ? int(s.events) : fmt(c, { [c]: t.list.reduce((a, x) => a + (x[c] || 0), 0) })}</td>`).join('')}</tr></tfoot></table>`
       : sel.events.length ? `<p class="empty">${sel.events.length === 1 ? `${esc(sel.events[0].event)} has` : `These ${sel.events.length} events have`} no stock used. Choose an event-level "Total by" (Event, Day, Month…) to see revenue and pax.</p>`
       : '<p class="empty">Nothing in this period. Try a longer period, or remove a filter.</p>';
@@ -222,12 +242,27 @@
     $('consTo').onchange = (e) => { ui.to = e.target.value; renderPanel(); };
     $('consSearch').oninput = (e) => { ui.search = e.target.value; renderPanel(); };
     $('consExport').onclick = exportCsv;
+    $('consAlerts').addEventListener('keydown', (e) => {
+      if (e.target.matches('[data-ok-note]') && e.key === 'Enter') { e.preventDefault(); const b = $('consAlerts').querySelector('[data-ok-save]'); if (b) b.click(); }
+      if (e.target.matches('[data-ok-note]') && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); editingOk = null; renderPanel(); }
+    });
     $('consDlg').addEventListener('click', (e) => {
       if (e.target === $('consDlg')) return $('consDlg').close();
       const th = e.target.closest('[data-sort]');
       if (th) { const c = th.dataset.sort; const cur = ui.sort || lastTable.sort; ui.sort = { col: c, dir: cur.col === c ? -cur.dir : (c === 'k' ? 1 : -1) }; return renderPanel(); }
       const tr = e.target.closest('[data-drill]');
       if (tr) { ui.filters.push({ g: ui.group, v: tr.dataset.drill }); ui.group = GROUPS[ui.group].next; ui.sort = null; return renderPanel(); }
+      const st = e.target.closest('[data-ok-start]');
+      if (st) { editingOk = st.dataset.okStart; renderPanel(); const inp = $('consAlerts').querySelector('[data-ok-note]'); if (inp) inp.focus(); return; }
+      if (e.target.closest('[data-ok-cancel]')) { editingOk = null; return renderPanel(); }
+      const sv = e.target.closest('[data-ok-save]');
+      if (sv) {
+        const inp = $('consAlerts').querySelector('[data-ok-note]');
+        okMap[sv.dataset.okSave] = { at: new Date().toISOString(), note: inp ? inp.value.trim() : '' };
+        editingOk = null; saveOk(); renderWin(); return renderPanel();
+      }
+      const ud = e.target.closest('[data-ok-undo]');
+      if (ud) { delete okMap[ud.dataset.okUndo]; saveOk(); renderWin(); return renderPanel(); }
       const un = e.target.closest('[data-unfilter]');
       if (un) { if (un.dataset.unfilter === 'all') ui.filters = []; else ui.filters.splice(+un.dataset.unfilter, 1); renderPanel(); }
     });
