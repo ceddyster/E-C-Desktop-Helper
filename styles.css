@@ -341,3 +341,9 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .cons-table tbody tr:hover { background: var(--surface-2); }
 .cons-table tfoot td { font-weight: 700; border-top: 2px solid var(--border); }
 .also { color: var(--danger); font-size: .78rem; font-weight: 600; }
+
+.rev-alert { margin-top: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); font-size: .88rem; }
+.rev-alert strong { color: var(--danger); }
+.rev-alert ul { margin: 6px 0 4px; padding-left: 18px; list-style: disc; }
+.rev-alert li { padding: 2px 0; }
+.rev-flag { color: var(--danger); font-size: .78rem; font-weight: 600; white-space: nowrap; }
