@@ -446,8 +446,11 @@
     }
     if (first.isCons) {
       // One consumption workbook per day: a re-saved copy of the same day replaces it.
-      const day = first.cons.date || name.toLowerCase();
-      return { fileName: name, sheets, sourceId: 'src:cons:' + day, auto: true, cons: first.cons,
+      // One record per report file and day, so two reports can never overwrite each other, while a
+      // re-saved copy of the same report ("05 (1).xlsm", "05 - Copy.xlsm") still replaces it.
+      const day = first.cons.date || 'undated';
+      const base = name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*(\(\d+\)|-\s*copy(\s*\(\d+\))?)\s*$/i, '').trim().toLowerCase();
+      return { fileName: name, sheets, sourceId: `src:cons:${day}|${base}`, auto: true, cons: first.cons,
         displayName: `Bar consumption · ${first.cons.date ? fmtShort(first.cons.date) : name}` };
     }
     if (first.isBEO && first.beoNumber) {
@@ -569,6 +572,8 @@
       state.events.push(...events); state.shifts.push(...shifts);
       const src = { id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null, beoCreated: file.beoCreated || null };
       if (file.cons) {
+        // Older versions stored one record per date ("src:cons:2026-07-05"); replace it.
+        if (file.cons.date && state.sources.some((x) => x.id === 'src:cons:' + file.cons.date)) removeSource('src:cons:' + file.cons.date, true);
         // Consumption data lives in IndexedDB; the source entry just records it.
         Object.assign(src, { cons: true, consDate: file.cons.date, events: file.cons.events.length, units: Math.round(file.cons.rows.reduce((a, x) => a + x.used, 0)) });
         window.CrownConsUI.add(id, file.cons);
@@ -591,7 +596,7 @@
   const F = window.CrownFolder;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 10;
+  const READER_VERSION = 11;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';

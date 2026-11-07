@@ -111,7 +111,7 @@
     const hidden = new Set(((wb.Workbook && wb.Workbook.Sheets) || []).filter((x) => x && x.Hidden).map((x) => x.name));
     const skippedHidden = [];
     for (const sn of wb.SheetNames) {
-      if (hidden.has(sn)) { if (!/^summary$/i.test(sn.trim())) skippedHidden.push(sn.trim()); continue; }
+      if (hidden.has(sn) && !/^summary$/i.test(sn.trim())) { skippedHidden.push(sn.trim()); continue; }
       const ws = wb.Sheets[sn]; if (!ws || !ws['!ref']) continue;
       const c = cellReader(ws);
       if (/^summary$/i.test(sn.trim())) { const d = c.date(1, 1); if (d) wbDate = iso(d); continue; }
@@ -160,8 +160,25 @@
       events.push(ev);
       rows.push(...evRows);
     }
+    // The report's day: Summary A1, checked against the day in the file name ("04.xlsm" = the 4th).
+    const fd = String(fileName || '').replace(/^.*[\\/]/, '').match(/^\s*(\d{1,2})(?!\d)/);
+    if (fd && wbDate && +fd[1] >= 1 && +fd[1] <= 31 && +wbDate.slice(8, 10) !== +fd[1]) {
+      const fixed = `${wbDate.slice(0, 8)}${String(+fd[1]).padStart(2, '0')}`;
+      if (global.CrownParse.toISODate(fixed) === fixed) {
+        warnings.push(`The Summary date (${wbDate}) doesn't match the file name (day ${+fd[1]}), so ${fixed} was used.`);
+        wbDate = fixed;
+      }
+    }
     if (!wbDate) wbDate = events.map((e) => e.date).filter(Boolean).sort()[0] || '';
-    events.forEach((e) => { if (!e.date) e.date = wbDate; });
+    // Every event in a day's report belongs to that day. A tab whose Date cell says otherwise (a typo, or
+    // left over from a copied report) is put on the report's day, and the difference is noted.
+    events.forEach((e) => {
+      if (e.date && wbDate && e.date !== wbDate) {
+        warnings.push(`${e.tab}: its Date cell says ${e.date}, but this is the ${wbDate} report, so ${wbDate} was used.`);
+        e.tabDate = e.date;
+      }
+      e.date = wbDate || e.date;
+    });
     if (skippedHidden.length) warnings.push(`Skipped ${skippedHidden.length} hidden tab${skippedHidden.length === 1 ? '' : 's'}: ${skippedHidden.join(', ')}.`);
     return { date: wbDate, file: fileName, events, rows, warnings };
   }

@@ -202,7 +202,7 @@
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
     const byDate = (a, b) => a.date.localeCompare(b.date);
-    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''} <span class="muted small">· from ${esc(e.file || 'workbook')}${e.tab ? ' › ' + esc(e.tab) : ''}</span>`;
+    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''} <span class="muted small">· from ${esc(e.file || 'workbook')}${e.tab ? ' › ' + esc(e.tab) : ''}${e.tabDate ? ` (its Date cell says ${esc(fmtDay(e.tabDate))})` : ''}</span>`;
     const okForm = (type, e) => editingOk === okKey(type, e)
       ? `<span class="ok-form"><input type="text" data-ok-note placeholder="${esc(CHECKS[type].note)}" maxlength="120">
          <button class="btn sm primary" type="button" data-ok-save="${esc(okKey(type, e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`

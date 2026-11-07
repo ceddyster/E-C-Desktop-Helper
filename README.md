@@ -63,6 +63,8 @@ Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **
 - **The Total block:** gives each event's official beverage revenue, cost and cost %. These are the same figures as the workbook's Summary tab.
 - **Every consumption area is read:** all four bar blocks on each event tab, both Menu Tasting blocks, and the Internal Cost Transfer tabs. A filled-in block with no bar name is listed as "Bar 1", "Bar 2"… by position.
 - **Cross-check:** for each event, the units read from the bar blocks are compared with the workbook's own Total block. Any difference is flagged in the review window and the folder's file list.
+- **Every event belongs to its report's day.** The day comes from the Summary date, checked against the file name ("05.xlsm" = the 5th). A tab whose own Date cell says a different day (a typo, or left over from a copied report) is put on the report's day. The difference is shown in the review window, the folder list and on flagged events ("its Date cell says …").
+- Each report file is stored separately, so two reports can never overwrite each other. A re-saved copy of the same report ("05 (1).xlsm", "05 - Copy.xlsm") still replaces it.
 - **Hidden tabs are skipped** in consumption workbooks and TL sheets (e.g. an old event tab left in a workbook copied from another day). The review window and the folder's file list name them.
 - Flagged events show which file and tab they came from (e.g. *from 05.xlsm › RSM One Zone*).
 - **Empty tabs** (Event 5…15 etc.) are skipped. A re-saved copy of the same day replaces the earlier one.
