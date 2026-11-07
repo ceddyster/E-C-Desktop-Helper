@@ -106,7 +106,12 @@
   function read(wb, fileName) {
     const events = [], rows = [], warnings = [];
     let wbDate = '';
+    // Hidden tabs (e.g. an old event tab left in a workbook copied from another day) aren't part of this
+    // day's report: skip them, and say so.
+    const hidden = new Set(((wb.Workbook && wb.Workbook.Sheets) || []).filter((x) => x && x.Hidden).map((x) => x.name));
+    const skippedHidden = [];
     for (const sn of wb.SheetNames) {
+      if (hidden.has(sn)) { if (!/^summary$/i.test(sn.trim())) skippedHidden.push(sn.trim()); continue; }
       const ws = wb.Sheets[sn]; if (!ws || !ws['!ref']) continue;
       const c = cellReader(ws);
       if (/^summary$/i.test(sn.trim())) { const d = c.date(1, 1); if (d) wbDate = iso(d); continue; }
@@ -157,6 +162,7 @@
     }
     if (!wbDate) wbDate = events.map((e) => e.date).filter(Boolean).sort()[0] || '';
     events.forEach((e) => { if (!e.date) e.date = wbDate; });
+    if (skippedHidden.length) warnings.push(`Skipped ${skippedHidden.length} hidden tab${skippedHidden.length === 1 ? '' : 's'}: ${skippedHidden.join(', ')}.`);
     return { date: wbDate, file: fileName, events, rows, warnings };
   }
 

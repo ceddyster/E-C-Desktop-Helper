@@ -211,7 +211,10 @@
   /** If this workbook is a TL sheet, returns one ready-to-import item; otherwise null. */
   /** bold: { sheetName: Set("K6", …) } from CrownXFmt, or null if formatting couldn't be read. */
   function readTLWorkbook(wb, fileName, bold) {
-    const tabs = wb.SheetNames.filter(isBarTab);
+    // Hidden bar tabs (left over from copying last week's workbook) aren't part of this week's roster.
+    const hidden = new Set(((wb.Workbook && wb.Workbook.Sheets) || []).filter((x) => x && x.Hidden).map((x) => x.name));
+    const hiddenBars = wb.SheetNames.filter((n) => isBarTab(n) && hidden.has(n));
+    const tabs = wb.SheetNames.filter((n) => isBarTab(n) && !hidden.has(n));
     if (!tabs.length) return null;
     const X = global.XLSX.utils;
     const all = { events: [], shifts: [], warnings: [] };
@@ -236,6 +239,7 @@
       all.events.push(...r.events); all.shifts.push(...r.shifts); all.warnings.push(...r.warnings);
       read.push(sn.trim());
     }
+    if (hiddenBars.length) all.warnings.push(`Skipped hidden bar tab${hiddenBars.length === 1 ? '' : 's'}: ${hiddenBars.join(', ')}.`);
     const skipped = wb.SheetNames.length - tabs.length;
     return {
       label: `TL Sheet · ${read.length} bar tab${read.length === 1 ? '' : 's'} (${read.join(', ')})${skipped ? ` · ${skipped} other tabs ignored` : ''}`,

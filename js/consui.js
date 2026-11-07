@@ -32,7 +32,7 @@
     const events = [], rows = [];
     for (const [id, day] of Object.entries(cache)) {
       (day.events || []).forEach((e, i) => {
-        const ev = Object.assign({ key: `${id}#${i}` }, e);
+        const ev = Object.assign({ key: `${id}#${i}`, file: day.file || '' }, e);
         events.push(ev);
         for (const r of day.rows || []) if (r.ev === i) rows.push(Object.assign({}, r, { e: ev }));
       });
@@ -202,7 +202,7 @@
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
     const byDate = (a, b) => a.date.localeCompare(b.date);
-    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''}`;
+    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''} <span class="muted small">· from ${esc(e.file || 'workbook')}${e.tab ? ' › ' + esc(e.tab) : ''}</span>`;
     const okForm = (type, e) => editingOk === okKey(type, e)
       ? `<span class="ok-form"><input type="text" data-ok-note placeholder="${esc(CHECKS[type].note)}" maxlength="120">
          <button class="btn sm primary" type="button" data-ok-save="${esc(okKey(type, e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`
