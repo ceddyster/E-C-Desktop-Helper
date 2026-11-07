@@ -112,7 +112,9 @@
     const map = new Map();
     const get = (k) => map.get(k) || map.set(k, { k, units: 0, charge: 0, cost: 0, revenue: 0, pax: 0, ev: new Set() }).get(k);
     for (const r of sel.rows) { const x = get(keyOf(ui.group, r)); x.units += r.used; x.charge += r.chg; if (!eventLevel) x.cost += r.cost; x.ev.add(r.e.key); }
-    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); if (missingRevenue(e)) x.flag = (x.flag || 0) + 1; else if (noRevenue(e)) x.checked = true; }
+    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); const oi = openIssues(e), ci = checkedIssues(e);
+      if (oi.length) { x.flag = (x.flag || 0) + 1; x.flagTypes = [...new Set([...(x.flagTypes || []), ...oi])]; }
+      if (ci.length) x.okTypes = [...new Set([...(x.okTypes || []), ...ci])]; }
     const cols = eventLevel
       ? [['units', 'Units used'], ['pax', 'Pax'], ['revenue', 'Bev revenue (ex GST)'], ['cost', 'Bev cost'], ['pct', 'Cost %'], ['events', 'Events']]
       : [['units', 'Units used'], ['charge', 'On-consumption value (inc GST)'], ['cost', 'Cost'], ['events', 'Events']];
@@ -130,10 +132,29 @@
   try { okMap = JSON.parse(localStorage.getItem(OK_KEY) || '{}') || {}; } catch (_) { okMap = {}; }
   const okId = (e) => `${e.date}|${String(e.beo || '').trim()}|${String(e.event || '').trim().toLowerCase()}`;
   const saveOk = () => { try { localStorage.setItem(OK_KEY, JSON.stringify(okMap)); } catch (_) {} };
-  const noRevenue = (e) => (e.units > 0 || e.cost > 0) && !e.revenue;
-  const isChecked = (e) => !!okMap[okId(e)];
-  const missingRevenue = (e) => noRevenue(e) && !isChecked(e);
-  let editingOk = null;   // okId of the event whose note is being typed
+  /* Report checks. Each can be marked OK per event (with a note) when it's genuinely fine. */
+  const CHECKS = {
+    noRevenue: {   // stock used, but no beverage revenue entered
+      test: (e) => (e.units > 0 || e.cost > 0) && !e.revenue,
+      title: (n) => `${n} event${n === 1 ? '' : 's'} used stock but ${n === 1 ? 'has' : 'have'} no beverage revenue entered in the report`,
+      tag: 'no revenue entered', okTag: 'revenue elsewhere', short: 'no revenue entered',
+      note: 'Where is the revenue? (optional) e.g. on the LGPA tab',
+      help: 'Until the revenue is entered, revenue is understated and cost % overstated for this period.',
+    },
+    noStock: {     // beverage revenue charged, but no beverages recorded in any bar section
+      test: (e) => e.revenue > 0 && !(e.units > 0) && !(e.cost > 0),
+      title: (n) => `${n} event${n === 1 ? '' : 's'} ${n === 1 ? 'has' : 'have'} beverage revenue but no beverages recorded in the report`,
+      tag: 'no stock recorded', okTag: 'no stock needed', short: 'no stock recorded',
+      note: 'Why? (optional) e.g. stock counted on the LGPA tab',
+      help: 'Until the stock is entered, beverage cost and cost % are understated for this period.',
+    },
+  };
+  // Older "OK" ticks (before there were two checks) belong to the no-revenue check.
+  const okKey = (type, e) => (type === 'noRevenue' ? okId(e) : `${type}|${okId(e)}`);
+  const issuesOf = (e) => Object.keys(CHECKS).filter((t) => CHECKS[t].test(e));
+  const openIssues = (e) => issuesOf(e).filter((t) => !okMap[okKey(t, e)]);
+  const checkedIssues = (e) => issuesOf(e).filter((t) => okMap[okKey(t, e)]);
+  let editingOk = null;   // okKey of the check whose note is being typed
   // "Charlie - TL Yulei" / "Ashleigh/ Richard TL: Caitlin" → "Charlie" / "Ashleigh/ Richard"
   const smOf = (e) => (e.sm ? e.sm.split(/\s+-\s+|\s*\bTL\b|:/i)[0].replace(/[\s\-\/]+$/, '').trim() : '');
 
@@ -160,14 +181,14 @@
     const top = new Map(); for (const r of rows) top.set(r.prod, (top.get(r.prod) || 0) + r.used);
     const best = [...top.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
     $('consWinSub').textContent = `${label} · ${s.events} event${s.events === 1 ? '' : 's'}`;
-    const miss = evs.filter(missingRevenue);
+    const miss = evs.filter((e) => openIssues(e).length);
     body.innerHTML = `<div class="kpis">
         <div><span>Units used</span><b>${int(s.units)}</b></div>
         <div><span>Bev revenue</span><b>${money(s.revenue)}</b></div>
         <div><span>Bev cost</span><b>${money(s.cost)}</b></div>
         <div><span>Cost %</span><b>${pct(s.costPct)}</b></div>
       </div>
-      ${miss.length ? `<p class="win-warn">⚠ No revenue entered: ${miss.map((e) => esc(e.event) + (smOf(e) ? ` (${esc(smOf(e))})` : '')).join(', ')}</p>` : ''}
+      ${miss.length ? `<p class="win-warn">⚠ Reports to check: ${miss.map((e) => `${esc(e.event)} (${openIssues(e).map((t) => CHECKS[t].short).join(', ')}${smOf(e) ? ' · ' + esc(smOf(e)) : ''})`).join('; ')}</p>` : ''}
       ${best.length ? `<p class="label" style="margin:10px 0 4px">Most used</p><ul class="win-top">${best.map(([p, n]) => `<li><span>${esc(p)}</span><b>${int(n)}</b></li>`).join('')}</ul>` : ''}`;
   }
 
@@ -180,20 +201,26 @@
       : `${sel.from.startsWith('0000') ? '…' : fmtDayY(sel.from)} – ${sel.to.startsWith('9999') ? '…' : fmtDayY(sel.to)}`;
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
-    const missing = sel.events.filter(missingRevenue).sort((a, b) => a.date.localeCompare(b.date));
-    const checked = sel.events.filter((e) => noRevenue(e) && isChecked(e)).sort((a, b) => a.date.localeCompare(b.date));
-    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''}`;
-    const okForm = (e) => editingOk === okId(e)
-      ? `<span class="ok-form"><input type="text" data-ok-note placeholder="Where is the revenue? (optional) e.g. on the LGPA tab" maxlength="120">
-         <button class="btn sm primary" type="button" data-ok-save="${esc(okId(e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`
-      : `<button class="btn sm" type="button" data-ok-start="${esc(okId(e))}">✓ Mark as OK</button>`;
-    $('consAlerts').innerHTML = (missing.length ? `<div class="rev-alert"><strong>⚠ ${missing.length} event${missing.length === 1 ? '' : 's'} used stock but ${missing.length === 1 ? 'has' : 'have'} no beverage revenue entered in the report</strong><ul>${missing.map((e) =>
-      `<li>${line(e)} ${okForm(e)}</li>`).join('')}</ul>
-      <p class="muted small">Until the figures are entered in the workbook, revenue is understated and cost % overstated for this period. Once it's re-saved, the dashboard picks it up automatically. If the revenue is recorded elsewhere (e.g. on another event's tab for the same client), use <b>Mark as OK</b>.</p></div>` : '')
-      + (checked.length ? `<details class="ok-list"><summary>✓ ${checked.length} event${checked.length === 1 ? '' : 's'} with $0 revenue checked as OK</summary><ul>${checked.map((e) => {
-        const ok = okMap[okId(e)];
-        return `<li>${line(e)}${ok.note ? ` · <i>${esc(ok.note)}</i>` : ''} <span class="muted small">(checked ${esc(new Date(ok.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))})</span> <button class="linkbtn" type="button" data-ok-undo="${esc(okId(e))}">undo</button></li>`;
-      }).join('')}</ul></details>` : '');
+    const byDate = (a, b) => a.date.localeCompare(b.date);
+    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''}`;
+    const okForm = (type, e) => editingOk === okKey(type, e)
+      ? `<span class="ok-form"><input type="text" data-ok-note placeholder="${esc(CHECKS[type].note)}" maxlength="120">
+         <button class="btn sm primary" type="button" data-ok-save="${esc(okKey(type, e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`
+      : `<button class="btn sm" type="button" data-ok-start="${esc(okKey(type, e))}">✓ Mark as OK</button>`;
+    let html = '';
+    const checkedRows = [];
+    for (const [type, c] of Object.entries(CHECKS)) {
+      const open = sel.events.filter((e) => openIssues(e).includes(type)).sort(byDate);
+      sel.events.filter((e) => checkedIssues(e).includes(type)).sort(byDate).forEach((e) => checkedRows.push([type, e]));
+      if (!open.length) continue;
+      html += `<div class="rev-alert"><strong>⚠ ${c.title(open.length)}</strong><ul>${open.map((e) => `<li>${line(e)} ${okForm(type, e)}</li>`).join('')}</ul>
+        <p class="muted small">${c.help} Once the workbook is fixed and re-saved, the dashboard picks it up automatically. If it's correct as it is, use <b>Mark as OK</b>.</p></div>`;
+    }
+    if (checkedRows.length) html += `<details class="ok-list"><summary>✓ ${checkedRows.length} report check${checkedRows.length === 1 ? '' : 's'} marked as OK</summary><ul>${checkedRows.map(([type, e]) => {
+      const ok = okMap[okKey(type, e)];
+      return `<li>${line(e)} · <span class="ok-tag">${esc(CHECKS[type].okTag)}</span>${ok.note ? ` · <i>${esc(ok.note)}</i>` : ''} <span class="muted small">(checked ${esc(new Date(ok.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))})</span> <button class="linkbtn" type="button" data-ok-undo="${esc(okKey(type, e))}">undo</button></li>`;
+    }).join('')}</ul></details>`;
+    $('consAlerts').innerHTML = html;
     $('consCards').innerHTML = (sel.rowFiltered
       ? [['Units used', int(s.units)], ['On-consumption value', money(s.charge)], ['Cost', money(s.rowCost)], ['Events', int(s.events)]]
       : [['Events', int(s.events)], ['Pax', int(s.pax)], ['Units used', int(s.units)], ['Bev revenue (ex GST)', money(s.revenue)], ['Bev cost', money(s.cost)], ['Cost %', pct(s.costPct)], ['Revenue per head', money(s.perHead)]])
@@ -203,7 +230,7 @@
     const fmt = (c, x) => (c === 'units' || c === 'pax' || c === 'events' ? int(x[c]) : c === 'pct' ? pct(x[c]) : money(x[c]));
     const arrow = (c) => (t.sort.col === c ? (t.sort.dir > 0 ? ' ▲' : ' ▼') : '');
     $('consTable').innerHTML = t.list.length ? `<table><thead><tr><th data-sort="k">${esc(g.label)}${arrow('k')}</th>${t.cols.map(([c, l]) => `<th data-sort="${c}" class="n">${l}${arrow(c)}</th>`).join('')}</tr></thead>
-      <tbody>${t.list.map((x) => `<tr data-drill="${esc(x.k)}" title="Show only ${esc(g.show ? g.show(x.k) : x.k)}"><td>${esc(g.show ? g.show(x.k) : x.k)}${x.flag ? ` <span class="rev-flag" title="Stock used but no beverage revenue entered">⚠ no revenue entered${ui.group === 'event' ? '' : ` (${x.flag})`}</span>` : x.checked && ui.group === 'event' ? ' <span class="ok-tag" title="$0 revenue checked as OK">✓ revenue elsewhere</span>' : ''}</td>${t.cols.map(([c]) => `<td class="n">${fmt(c, x)}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tbody>${t.list.map((x) => `<tr data-drill="${esc(x.k)}" title="Show only ${esc(g.show ? g.show(x.k) : x.k)}"><td>${esc(g.show ? g.show(x.k) : x.k)}${x.flag ? ` <span class="rev-flag">⚠ ${ui.group === 'event' ? x.flagTypes.map((t) => CHECKS[t].tag).join(', ') : `${x.flag} to check`}</span>` : x.okTypes && ui.group === 'event' ? ` <span class="ok-tag" title="Checked as OK">✓ ${x.okTypes.map((t) => CHECKS[t].okTag).join(', ')}</span>` : ''}</td>${t.cols.map(([c]) => `<td class="n">${fmt(c, x)}</td>`).join('')}</tr>`).join('')}</tbody>
       <tfoot><tr><td>Total</td>${t.cols.map(([c]) => `<td class="n">${c === 'pct' ? pct(t.list.reduce((a, x) => a + x.cost, 0) / (t.list.reduce((a, x) => a + x.revenue, 0) || NaN)) : c === 'events' ? int(s.events) : fmt(c, { [c]: t.list.reduce((a, x) => a + (x[c] || 0), 0) })}</td>`).join('')}</tr></tfoot></table>`
       : sel.events.length ? `<p class="empty">${sel.events.length === 1 ? `${esc(sel.events[0].event)} has` : `These ${sel.events.length} events have`} no stock used. Choose an event-level "Total by" (Event, Day, Month…) to see revenue and pax.</p>`
       : '<p class="empty">Nothing in this period. Try a longer period, or remove a filter.</p>';
