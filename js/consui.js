@@ -83,13 +83,19 @@
     const inPeriod = (e) => e.date >= from && e.date <= to;
     const evOk = (e) => inPeriod(e) && ui.filters.every((f) => GROUPS[f.g].row || GROUPS[f.g].key(e) === f.v);
     const q = ui.search.trim().toLowerCase();
-    const rowOk = (r) => evOk(r.e) && ui.filters.every((f) => !GROUPS[f.g].row || GROUPS[f.g].key(r) === f.v)
-      && (!q || `${r.prod} ${r.cat} ${r.bar} ${r.e.event}`.toLowerCase().includes(q));
-    const rowFiltered = !!q || ui.filters.some((f) => GROUPS[f.g].row);
+    // Search: if it matches an event (name, BEO #, room, managers, type), show those events — including
+    // ones that used no stock. Otherwise it searches products, categories and bars.
+    const evText = (e) => `${e.event} ${e.beo} ${e.room} ${e.em} ${e.sm} ${e.dm} ${e.type}`.toLowerCase();
+    const evSearch = !!q && events.some((e) => evOk(e) && evText(e).includes(q));
+    const evOk2 = (e) => evOk(e) && (!evSearch || evText(e).includes(q));
+    const rowOk = (r) => evOk2(r.e) && ui.filters.every((f) => !GROUPS[f.g].row || GROUPS[f.g].key(r) === f.v)
+      && (!q || evSearch || `${r.prod} ${r.cat} ${r.bar}`.toLowerCase().includes(q));
+    const rowFiltered = (!!q && !evSearch) || ui.filters.some((f) => GROUPS[f.g].row);
     const selRows = rows.filter(rowOk);
-    const selEvents = rowFiltered ? [...new Map(selRows.map((r) => [r.e.key, r.e])).values()] : events.filter(evOk);
-    return { events: selEvents, rows: selRows, rowFiltered, from, to };
+    const selEvents = rowFiltered ? [...new Map(selRows.map((r) => [r.e.key, r.e])).values()] : events.filter(evOk2);
+    return { events: selEvents, rows: selRows, rowFiltered, evSearch, from, to };
   }
+
 
   function summarise(sel) {
     const s = { events: sel.events.length, pax: sel.events.reduce((a, e) => a + (e.pax || 0), 0),
@@ -168,6 +174,7 @@
     $('consTable').innerHTML = t.list.length ? `<table><thead><tr><th data-sort="k">${esc(g.label)}${arrow('k')}</th>${t.cols.map(([c, l]) => `<th data-sort="${c}" class="n">${l}${arrow(c)}</th>`).join('')}</tr></thead>
       <tbody>${t.list.map((x) => `<tr data-drill="${esc(x.k)}" title="Show only ${esc(g.show ? g.show(x.k) : x.k)}"><td>${esc(g.show ? g.show(x.k) : x.k)}</td>${t.cols.map(([c]) => `<td class="n">${fmt(c, x)}</td>`).join('')}</tr>`).join('')}</tbody>
       <tfoot><tr><td>Total</td>${t.cols.map(([c]) => `<td class="n">${c === 'pct' ? pct(t.list.reduce((a, x) => a + x.cost, 0) / (t.list.reduce((a, x) => a + x.revenue, 0) || NaN)) : c === 'events' ? int(s.events) : fmt(c, { [c]: t.list.reduce((a, x) => a + (x[c] || 0), 0) })}</td>`).join('')}</tr></tfoot></table>`
+      : sel.events.length ? `<p class="empty">${sel.events.length === 1 ? `${esc(sel.events[0].event)} has` : `These ${sel.events.length} events have`} no stock used. Choose an event-level "Total by" (Event, Day, Month…) to see revenue and pax.</p>`
       : '<p class="empty">Nothing in this period. Try a longer period, or remove a filter.</p>';
     $('consNote').textContent = t.list.length && !t.eventLevel
       ? 'Units, values and costs here come from each bar\'s sheet. The official event Bev cost (from each Total block) can differ slightly for à la carte items.'
