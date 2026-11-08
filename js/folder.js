@@ -91,6 +91,8 @@
       }
       const mi = MONTHS.findIndex((mn) => new RegExp(`(^|[^a-z])${mn}`).test(p));
       if (mi >= 0) month = mi;
+      // A numbered month folder inside a year folder: "2025/07" or "2025/07 - July".
+      else if ((year != null || fyEnd) && month == null && (m = p.match(/^\s*(\d{1,2})(?!\d)/)) && +m[1] >= 1 && +m[1] <= 12) month = +m[1] - 1;
     }
     const last = (y, mo) => { const d = new Date(y, mo + 1, 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
     if (fyEnd) return month != null ? last(month >= 6 ? fyEnd - 1 : fyEnd, month) : `${fyEnd}-06-30`;
