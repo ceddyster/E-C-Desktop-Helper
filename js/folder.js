@@ -46,11 +46,16 @@
   }
 
   /** Lists TL/BEO-type files (sub-folders up to 6 deep). Skips Office lock files (~$…). */
-  async function list(h, prefix = '', depth = 0, out = []) {
+  // opts.before ('YYYY-MM-DD'): skip sub-folders whose name says they only hold older material
+  // (e.g. "2024", "FY24", "2023-24", "June 2025" when keeping from 1 July 2025). Their names go in out.skippedDirs.
+  async function list(h, prefix = '', depth = 0, out = [], opts = {}) {
+    if (!out.skippedDirs) out.skippedDirs = [];
     for await (const [name, entry] of h.entries()) {
       if (name.startsWith('~$') || name.startsWith('.')) continue;
       if (entry.kind === 'directory') {
-        if (depth < MAX_DEPTH) await list(entry, `${prefix}${name}/`, depth + 1, out);
+        const end = opts.before ? periodEnd(`${prefix}${name}`) : null;
+        if (end && end < opts.before) { out.skippedDirs.push(prefix + name); continue; }
+        if (depth < MAX_DEPTH) await list(entry, `${prefix}${name}/`, depth + 1, out, opts);
       } else if (WANT.test(name)) {
         try {
           const file = await entry.getFile();
@@ -64,6 +69,33 @@
       }
     }
     return out;
+  }
+
+  /** The last day a folder path clearly covers, from its folder names, or null if it doesn't say.
+   *  "2024" → 2024-12-31 · "FY24" / "FY 2023-24" / "2023-2024" → 2024-06-30 · "2025/June" or "June 2025" → 2025-06-30. */
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  function periodEnd(path) {
+    let year = null, month = null, fyEnd = null;
+    const y4 = (n) => (+n < 100 ? 2000 + +n : +n);
+    for (const part of String(path).split('/').filter(Boolean)) {
+      const p = part.toLowerCase();
+      let m;
+      if ((m = p.match(/\bfy\s*'?(\d{2}|\d{4})\s*[-\/–]\s*(\d{2}|\d{4})\b/)) || (m = p.match(/\b(20\d{2})\s*[-\/–]\s*(\d{2}|20\d{2})\b/))) {
+        const a = y4(m[1]), b = y4(m[2]);
+        if (b === a + 1) fyEnd = b;                                    // "2023-24": a financial year
+        else if (+m[2] >= 1 && +m[2] <= 12 && m[2].length <= 2) { year = a; month = +m[2] - 1; }   // "2025-06": year-month
+      } else if ((m = p.match(/\bfy\s*'?(\d{2}|20\d{2})\b/))) {
+        fyEnd = y4(m[1]);
+      } else if ((m = p.match(/\b(20\d{2})\b/))) {
+        year = +m[1];
+      }
+      const mi = MONTHS.findIndex((mn) => new RegExp(`(^|[^a-z])${mn}`).test(p));
+      if (mi >= 0) month = mi;
+    }
+    const last = (y, mo) => { const d = new Date(y, mo + 1, 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    if (fyEnd) return month != null ? last(month >= 6 ? fyEnd - 1 : fyEnd, month) : `${fyEnd}-06-30`;
+    if (year != null) return month != null ? last(year, month) : `${year}-12-31`;
+    return null;
   }
 
   /** Windows internet shortcut → its web address. */
@@ -113,6 +145,6 @@
   }
   async function remove(id) { await storeAll((await savedAll()).filter((it) => it.id !== id)); }
 
-  global.CrownFolder = { shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
+  global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
     savedAll, choose, add, remove };
 })(window);

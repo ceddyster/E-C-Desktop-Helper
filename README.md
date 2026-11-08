@@ -79,6 +79,12 @@ Click the **Bar consumption** window for the totals panel:
 - **Missing revenue check:** any event that used stock but has no beverage revenue entered (a report that wasn't finished) is flagged. The flag shows in red at the top of the panel, with the date, BEO #, units, cost and **service manager**; with *⚠ no revenue entered* beside it in the table; and as a warning line in the main-page window. When the $0 is correct, e.g. the revenue is recorded on another event's tab for the same client, click **✓ Mark as OK** and add an optional note. Checked events stop warning, show *✓ revenue elsewhere* in the table, and are listed under *checked as OK* with your note and an **undo**. This is remembered in this browser by date, BEO # and event name, so re-reading the workbook doesn't bring the warning back.
 - **Search** an event name, BEO #, room or manager to show those events, including events that used no stock. Or search a product, category or bar name. **Click a heading** to sort. **Export CSV** saves the current table.
 
+**Faster checks on big folders:** linked folders only look at what can hold data being kept. With the default setting, that means from 1 July of last financial year.
+- **Older folders aren't opened.** These are folders whose names show an earlier period, e.g. `2024`, `FY24`, `FY 2023-24`, `2024-2025`, `June 2025` or `2025/01 January`. They're listed under *Older folders skipped* in Documents. Folders with no date in their name, like *November* or *Week 45*, are always checked.
+- **Files last saved before that date aren't read.** If one is edited later, it's picked up again.
+
+The cut-off moves forward each 1 July and follows the *Keep bar consumption data for* setting. Choose *Forever* to look at everything.
+
 Consumption data is kept in the browser's IndexedDB, separately from events. By default it keeps **this and last financial year** (1 July – 30 June). For example, on 6 Nov 2026 it keeps everything from 1 Jul 2025; on 1 Jul 2027 FY 2025–26 drops off. Other options are in ⚙︎ Settings: three financial years, 12 months, 2 years or forever. The totals panel has **This / Last financial year** periods and a **Financial year** grouping. The dashboard asks the browser to keep this data even when disk space runs low. Because the workbooks stay in their folder, **Re-read all** can always rebuild the totals.
 
 ### TL Sheet → bar team roster

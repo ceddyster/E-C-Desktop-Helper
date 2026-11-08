@@ -679,7 +679,12 @@
     if (st.readerVersion !== READER_VERSION) { st.seen = {}; st.readerVersion = READER_VERSION; }
     st.files = st.files || {};
     try {
-      const files = await F.list(f.handle);
+      // Only look at what can hold data we're keeping: from the start of the oldest period kept
+      // (with the default setting, 1 July of last financial year).
+      const keepFrom = consCutoff(state.consKeep);
+      const keepFromMs = keepFrom ? parseISO(keepFrom).getTime() : 0;
+      const files = await F.list(f.handle, '', 0, [], { before: keepFrom });
+      st.skippedDirs = files.skippedDirs || [];
       const present = new Set(files.map((x) => x.path));
       for (const k of Object.keys(st.files)) if (!present.has(k)) delete st.files[k];
       const cutoff = Date.now() - FIRST_SCAN_DAYS * 864e5;
@@ -688,6 +693,12 @@
         if (x.target !== undefined) { st.files[x.path] = { status: 'shortcut', detail: x.target, site: F.sharePointSite(x.target) }; continue; }
         if (x.error) { st.files[x.path] = { status: 'error', detail: `couldn't open (${x.error}). If it shows a cloud icon in File Explorer, right-click → Always keep on this device.` }; continue; }
         if (st.seen[x.path] === x.lastModified) continue;
+        // Last saved before the kept period starts, so it can't hold this or last financial year's data.
+        // (If someone edits it later, its saved time changes and it's looked at again.)
+        if (keepFromMs && x.lastModified < keepFromMs) {
+          st.files[x.path] = { status: 'old', saved: x.lastModified, detail: `last saved before ${fmtShort(keepFrom)}, outside the period kept` };
+          continue;
+        }
         // Spreadsheets (TL Sheets) are always read. PDFs untouched for 60+ days are left out to keep things quick.
         if (/\.(pdf|ics)$/i.test(x.name) && st.seen[x.path] == null && x.lastModified < cutoff) {
           st.files[x.path] = { status: 'old', detail: `not changed in ${FIRST_SCAN_DAYS}+ days` };
@@ -765,7 +776,7 @@
     const panel = $('folderPanel');
     if (!panel) return;
     if (!F || !F.supported) { panel.innerHTML = '<p class="muted small">Linking a folder needs Microsoft Edge or Google Chrome.</p>'; return; }
-    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet, BEO or consumption workbook', old: 'Older PDFs not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
+    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet, BEO or consumption workbook', old: 'Older files not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
     const boxes = folders.map((f) => {
       const st = fstate(f.id);
       const files = Object.entries(st.files || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -795,6 +806,7 @@
           <button class="btn sm danger" type="button" data-folder="unlink" data-id="${f.id}">Unlink</button>
         </div>
         ${shortcutHelp}
+        ${(st.skippedDirs || []).length ? `<details><summary>Older folders skipped: ${st.skippedDirs.length}</summary><ul>${st.skippedDirs.map((d) => `<li><b>${esc(d)}</b></li>`).join('')}</ul><p class="muted small">Their names show they only hold material from before ${esc(fmtShort(consCutoff(state.consKeep)))}, so they aren't opened. This follows the "Keep bar consumption data for" setting.</p></details>` : ''}
         ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
           `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
       </div>`;
