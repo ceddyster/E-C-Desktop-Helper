@@ -119,7 +119,7 @@ No extra folder is needed: the sheets use the BEOs the dashboard already reads. 
 - **Items** are what the BEO lists under *Beverages on consumption*, **exactly as written** and in the same order, without prices ("Hahn Super Dry 3.5 @ $11.50 per bottle" → *Hahn Super Dry 3.5*).
 - **Add an item** by typing it and pressing **Add** (it suggests items from other BEOs). Items can be renamed, moved up or down (↑ ↓), or removed (✕).
 - **A separate sheet for each bar**: list the bars with commas and tick the box to print one page per bar.
-- **Print** prints just the sheet(s), one A4 page each. Your changes are kept as a draft for that event, and the window shows *✓ printed* once printed. **Start again from the BEO** throws the changes away.
+- **Print** prints just the sheet(s), one A4 page each. Your changes are kept as a draft for that event, and the window shows *✓ printed* once printed. **Start again from the BEO** throws the changes away. If the BEO is revised (a newer copy lands in the BEO folder with a different on-consumption list), the sheet's items are refreshed from it automatically, keeping anything you added by hand.
 - **New sheet (not linked to an event)** for anything that isn't on a BEO.
 
 ### TL Sheet → bar team roster

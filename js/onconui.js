@@ -19,8 +19,15 @@
   const B = () => global.CrownBeoBev;
 
   let drafts = {}, opts = {};
+  // Drafts from before version 2 could hold item names that weren't on the BEO (an earlier version
+  // matched them to a menu and listed soft drinks separately): they're thrown away.
+  const DRAFT_V = 2;
   let cur = null;          // the sheet open in the panel: { key, eventId, name, date, bars, from, to, perBar, blanks, items: [{ id, name }] }
   try { drafts = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {}; } catch (_) {}
+  if (Object.keys(drafts).some((k) => drafts[k].v !== DRAFT_V)) {
+    for (const k of Object.keys(drafts)) if (drafts[k].v !== DRAFT_V) delete drafts[k];
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts)); } catch (_) {}
+  }
   const storeDrafts = () => {
     // Keep the 60 most recent drafts.
     const keys = Object.keys(drafts).sort((a, b) => (drafts[b].savedAt || '').localeCompare(drafts[a].savedAt || ''));
@@ -48,9 +55,10 @@
   function fromEvent(x) {
     const e = x.e;
     return { key: x.key, eventId: e.id, name: e.title, date: e.date, bars: (e.bars || []).join(', ') || e.venue || '',
-      from: x.on.from || e.start || '', to: x.on.to || '', perBar: false, blanks: 3, items: x.on.items.map((name) => ({ id: uid(), name })) };
+      from: x.on.from || e.start || '', to: x.on.to || '', perBar: false, blanks: 3, items: x.on.items.map((name) => ({ id: uid(), name })),
+      v: DRAFT_V, beoItems: [...x.on.items] };
   }
-  const blank = () => ({ key: 'new', eventId: '', name: '', date: todayISO(), bars: '', from: '', to: '', perBar: false, blanks: 3, items: [] });
+  const blank = () => ({ v: DRAFT_V, key: 'new', eventId: '', name: '', date: todayISO(), bars: '', from: '', to: '', perBar: false, blanks: 3, items: [] });
   let n = 0;
   const uid = () => 'i' + Date.now().toString(36) + (n++);
 
@@ -108,8 +116,21 @@
   function load(key) {
     const list = upcoming(14);
     if (key === 'new') cur = drafts.new ? JSON.parse(JSON.stringify(drafts.new)) : blank();
-    else if (drafts[key]) cur = JSON.parse(JSON.stringify(drafts[key]));
-    else { const x = list.find((y) => y.key === key); cur = x ? fromEvent(x) : blank(); }
+    else {
+      const x = list.find((y) => y.key === key), d = drafts[key];
+      if (d && (!x || JSON.stringify(d.beoItems || []) === JSON.stringify(x.on.items))) cur = JSON.parse(JSON.stringify(d));
+      else if (x) {
+        // No draft, or the BEO's list has changed since the draft was made (a revised BEO): start from the
+        // BEO again, keeping anything that was added by hand.
+        cur = fromEvent(x);
+        if (d) {
+          const extra = (d.items || []).filter((i) => i.added && !cur.items.some((c) => c.name.toLowerCase() === i.name.toLowerCase()));
+          cur.items.push(...extra);
+          save();
+          if (opts.toast) opts.toast('The BEO has changed since this sheet was started, so its items have been updated from the BEO.');
+        }
+      } else cur = blank();
+    }
     renderPanel();
   }
 
@@ -138,7 +159,7 @@
   function addItem() {
     const name = $('ocAddName').value.trim(); if (!name) return;
     if (cur.items.some((i) => i.name.toLowerCase() === name.toLowerCase())) { if (opts.toast) opts.toast(`${name} is already on the sheet.`); return; }
-    cur.items.push({ id: uid(), name });
+    cur.items.push({ id: uid(), name, added: true });
     $('ocAddName').value = ''; save(); renderPanel(); $('ocAddName').focus();
   }
   function open(key) {
