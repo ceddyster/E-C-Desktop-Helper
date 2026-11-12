@@ -98,9 +98,11 @@ Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.x
 
 - **Each manager:** the name in column A, with a start time (`900`, `1630`, `900 - 1700`) or **RDO / AL** under each day. The line below the name is their **role** (BSM, Asst Ops Mgr…). The lines below that, up to the next manager, are the **events and duties** for each day (PWC, Setup, Duty Manager…).
 - **Section headings** (SERVICE, HIGH DUTIES, ADMINISTRATION) group the week view.
-- **A line with times or duties but no name** is shown as *Name not filled in*. Template lines with no name and nobody working are left out.
+- **Hidden rows and columns are ignored**, as they're not part of the roster you see in Excel.
+- **A visible line with times or duties but no name** is shown as *Name not filled in*. Template lines with no name and nobody working are left out.
+- **Leave:** RDO, **SL** (sick leave), **AL** (annual leave), LSL and PH show in the week view and on the window's "Off" line, e.g. *Supuni (Sick leave)*. People on leave all week still show; tick **Hide managers who are off all week** to hide them.
 - **Dates:** from the date row under Monday–Sunday, or from the file name if that's missing.
-- **The week view** shows Mon–Sun with today highlighted, ‹ / › to move between loaded weeks and **This week** to come back. **Only managers working this week** hides anyone who is off all week. Your name (⚙︎ Settings → My name) is highlighted.
+- **The week view** shows Mon–Sun with today highlighted, ‹ / › to move between loaded weeks and **This week** to come back. Your name (⚙︎ Settings → My name) is highlighted.
 - **One allocation per week:** a re-saved or renamed copy of the same week replaces it. Weeks are cleared with the rest of the old data (⚙︎ Settings → keep months).
 
 ### TL Sheet → bar team roster

@@ -32,6 +32,10 @@
   }
   const sortedWeeks = () => [...new Map(Object.values(weeks).map((w) => [w.weekStart, weekFor(w.weekStart)])).values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 
+  // Leave codes in full, for tooltips and the "Off" line.
+  const LEAVE = { RDO: 'RDO', AL: 'Annual leave', 'A/L': 'Annual leave', SL: 'Sick leave', 'S/L': 'Sick leave', SICK: 'Sick leave',
+    LSL: 'Long service leave', PH: 'Public holiday', 'PUBLIC HOLIDAY': 'Public holiday', LWOP: 'Leave without pay', 'ANNUAL LEAVE': 'Annual leave' };
+  const offName = (code) => LEAVE[code] || code;
   const working = (d) => d && !d.off && !!(d.start || d.text || d.events.length);
   const timeText = (d) => (d.start ? t12(d.start) + (d.end ? `–${t12(d.end)}` : '') : d.text || 'time not set');
   const isMe = (p) => { const me = (opts.myName ? opts.myName() : '').trim().toLowerCase(); return !!me && p.name.toLowerCase().split(/\s+/).some((w) => w === me || p.name.toLowerCase() === me); };
@@ -57,7 +61,7 @@
         <div class="win-ev"><span>${nameOf(p)}${p.role ? ` <span class="mgr-role">${esc(p.role)}</span>` : ''}</span><span class="t">${esc(timeText(d))}</span></div>
         ${d.events.length ? `<div class="mgr-evs">${d.events.map(esc).join(' · ')}</div>` : ''}</li>`).join('')
       : '<li class="win-empty">No managers rostered today.</li>')
-      + (off.length ? `<li class="mgr-off">Off: ${off.map(({ p, d }) => `${esc(p.name.split(' ')[0])} <span>(${esc(d.off)})</span>`).join(', ')}</li>` : '');
+      + (off.length ? `<li class="mgr-off">Off: ${off.map(({ p, d }) => `${esc(p.name.split(' ')[0])} <span>(${esc(offName(d.off))})</span>`).join(', ')}</li>` : '');
   }
 
   function renderPanel() {
@@ -70,16 +74,18 @@
     $('mgrPrev').disabled = i <= 0; $('mgrNext').disabled = i >= list.length - 1;
     $('mgrRange').textContent = `${fmtShort(w.dates[0])} – ${fmtShort(w.dates[6])} ${w.dates[6].slice(0, 4)}${w.file ? ` · from ${w.file}` : ''}`;
     const today = todayISO();
-    const onlyOn = $('mgrOnlyOn').checked;
-    const people = w.people.filter((p) => !onlyOn || w.dates.some((d) => working(p.days[d])));
+    // Everyone with something on the sheet this week shows, including people on leave all week.
+    // The tick box hides those not working at all this week (RDO / leave every day).
+    const hideOff = $('mgrOnlyOn').checked;
+    const people = w.people.filter((p) => !hideOff || w.dates.some((d) => working(p.days[d])));
     let lastSection = null;
     const rows = people.map((p) => {
       const head = p.section !== lastSection && p.section ? `<tr class="mgr-sec"><td colspan="8">${esc(p.section)}</td></tr>` : '';
       lastSection = p.section;
       return head + `<tr class="${isMe(p) ? 'mine' : ''}"><th scope="row">${nameOf(p)}${p.role ? `<span class="mgr-role">${esc(p.role)}</span>` : ''}</th>${w.dates.map((iso) => {
         const d = p.days[iso] || { events: [] };
-        const cls = [iso === today ? 'today' : '', d.off ? 'off' : '', !working(d) && !d.off ? 'none' : ''].filter(Boolean).join(' ');
-        return `<td class="${cls}">${d.off ? `<span class="mgr-offtag">${esc(d.off)}</span>` : working(d) ? `<b>${esc(timeText(d))}</b>${d.events.map((e) => `<span class="mgr-ev">${esc(e)}</span>`).join('')}` : ''}</td>`;
+        const cls = [iso === today ? 'today' : '', d.off ? 'off' : '', d.off && d.off !== 'RDO' ? 'leave' : '', !working(d) && !d.off ? 'none' : ''].filter(Boolean).join(' ');
+        return `<td class="${cls}">${d.off ? `<span class="mgr-offtag" title="${esc(offName(d.off))}">${esc(d.off === 'RDO' ? 'RDO' : offName(d.off))}</span>` : working(d) ? `<b>${esc(timeText(d))}</b>${d.events.map((e) => `<span class="mgr-ev">${esc(e)}</span>`).join('')}` : ''}</td>`;
       }).join('')}</tr>`;
     }).join('');
     $('mgrGrid').innerHTML = `<table><thead><tr><th>Manager</th>${w.dates.map((iso) => `<th class="${iso === today ? 'today' : ''}">${esc(parseISO(iso).toLocaleDateString('en-AU', { weekday: 'short' }))}<span>${parseISO(iso).getDate()}/${parseISO(iso).getMonth() + 1}</span></th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;

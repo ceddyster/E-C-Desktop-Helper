@@ -83,6 +83,7 @@
         : new Date(Math.round((first - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4);
       const mon = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - i);
       for (let k = 0; k < 7; k++) out.push(iso(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + k)));
+      out.row = R;
     }
     if (!out.length) {
       const m = String(fileName || '').match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
@@ -107,14 +108,18 @@
       const ds = dates(g, h, fileName);
       if (ds.length !== 7) { warnings.push('Couldn\'t find the week\'s dates.'); continue; }
       const nameCol = Math.max(g.r.s.c, Math.min(...h.cols.filter((c) => c != null)) - 1);
-      const dayCells = (R) => h.cols.map((C) => (C == null ? undefined : g.val(R, C)));
+      const hiddenCol = (C) => !!(ws['!cols'] && ws['!cols'][C] && ws['!cols'][C].hidden);
+      const dayCells = (R) => h.cols.map((C) => (C == null || hiddenCol(C) ? undefined : g.val(R, C)));
       // A row is a manager's row when at least one day holds a time or RDO / AL.
       const isShiftRow = (R) => dayCells(R).some((v) => shiftOf(v));
       // Section headings ("SERVICE", "ADMINISTRATION") are merged across the sheet.
       const merged = (ws['!merges'] || []).filter((m) => m.s.c === nameCol && m.e.c - m.s.c >= 3 && m.s.r === m.e.r).map((m) => m.s.r);
       const people = [];
       let section = '', cur = null;
-      for (let R = h.row + 1; R <= g.r.e.r; R++) {
+      // Hidden rows (old or unused lines someone has hidden in Excel) aren't part of the roster.
+      const hiddenRow = (R) => !!(ws['!rows'] && ws['!rows'][R] && ws['!rows'][R].hidden);
+      for (let R = Math.max(h.row, ds.row != null ? ds.row : -1) + 1; R <= g.r.e.r; R++) {
+        if (hiddenRow(R)) continue;
         const a = g.str(R, nameCol);
         const cells = dayCells(R);
         if (merged.includes(R)) { section = a.replace(/\s+/g, ' ').trim(); cur = null; continue; }

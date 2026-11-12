@@ -298,7 +298,7 @@
     if (!isText && global.CrownMgr) {
       // Manager allocation workbooks: "… Manager Allocation" title above a Monday–Sunday row.
       if (global.CrownMgr.looksLike(global.XLSX.read(buf, { type: 'array', sheetRows: 6 }))) {
-        const data = global.CrownMgr.read(global.XLSX.read(buf, { type: 'array', cellDates: true }), name);
+        const data = global.CrownMgr.read(global.XLSX.read(buf, { type: 'array', cellDates: true, cellStyles: true }), name);
         return [{ label: `Manager allocation · ${data.people.length} managers`, kind: 'ready', isMgr: true, mgr: data,
           ready: { events: [], shifts: [], warnings: data.warnings || [] } }];
       }
