@@ -635,8 +635,9 @@
 
   /* ---------- Linked folders ---------- */
   // Several folders can be linked (e.g. the synced SharePoint TL folder and a BEO folder). Each is
-  // checked every minute while the dashboard is open; only new or changed files are read.
+  // checked when the dashboard opens and on the hour while it's open; only new or changed files are read.
   const F = window.CrownFolder;
+  let nextCheckAt = null;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
   const READER_VERSION = 14;
@@ -783,7 +784,7 @@
           st.seen[x.path] = x.lastModified;
         } catch (e) {
           if (/doesn't look like a BEO|looks like a TL Sheet but has no bar tabs|shortcut/i.test(e.message)) {
-            // Readable, just not one of ours (contracts, banquet checks…): note it and don't re-read it every minute.
+            // Readable, just not one of ours (contracts, banquet checks…): note it and don't re-read it at every check.
             st.files[x.path] = { status: 'skipped', detail: e.message.replace(/^This PDF doesn't look like a BEO.*$/, 'PDF that isn\'t a BEO') };
             st.seen[x.path] = x.lastModified;
           } else {
@@ -877,7 +878,7 @@
           <button class="btn primary sm" type="button" data-folder="link">📁 ${folders.length ? 'Link another folder' : 'Link folder'}</button>
           ${folders.length ? '<button class="btn sm" type="button" data-folder="scan">Check all now</button>' : ''}
         </div>
-        ${folders.length ? '<p class="muted small">All linked folders are checked every minute while the dashboard is open.</p>' : ''}
+        ${folders.length ? `<p class="muted small">All linked folders are checked when the dashboard opens and on the hour, every hour, while it's open${nextCheckAt ? ` (next check ${nextCheckAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })})` : ''}. Use <b>Check all now</b> to check straight away.</p>` : ''}
       </div>`;
   }
 
@@ -943,10 +944,14 @@
       ({ link: () => linkFolder(), change: () => linkFolder(id), scan: () => scanAll(true), reread: () => rereadFolder(id),
         reconnect: reconnectFolders, unlink: () => unlinkFolder(id) })[a.dataset.folder]();
     };
-    // Look for new documents every few minutes, and whenever the dashboard comes back into view.
-    // Every minute: only files whose saved time changed are re-read, so this stays light.
-    setInterval(() => { if (!document.hidden) scanAll(false); }, 60000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) scanAll(false); });
+    // Linked folders are checked when the dashboard opens (initFolder) and then on the hour, every hour,
+    // while it's open (3:00, 4:00…). "Check all now" in Documents checks straight away.
+    const nextHour = () => { const d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0); return d; };
+    const scheduleHourly = () => {
+      nextCheckAt = nextHour();
+      setTimeout(() => { scanAll(false); scheduleHourly(); renderFolder(); }, Math.max(1000, nextCheckAt - Date.now()));
+    };
+    scheduleHourly();
     $('fileInput').onchange = async (e) => {
       const files = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, buf: await f.arrayBuffer() })));
       handleFiles(files);

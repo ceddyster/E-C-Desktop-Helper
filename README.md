@@ -47,7 +47,7 @@ Example files to try are in `samples/`. **Documents → Load sample data** fills
 Click **📁 Link folder** and choose a folder where TL Sheets or BEOs are saved. You can link several, e.g. the synced SharePoint TL folder and a folder you save BEOs into: **Documents → Link another folder**. Each folder has its own Re-read, Change folder and Unlink buttons. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
 
 - loads every TL workbook and BEO PDF in the folder, skipping files untouched for more than 60 days on the first check
-- checks every minute while it's open, and whenever you switch back to its tab. Any file whose saved time has changed is re-read, so edits to a TL workbook replace that week's shifts. A message names the files that were updated, and **Documents** shows each file's last-saved time.
+- checks when the dashboard opens, then **on the hour, every hour** while it's open (e.g. 3:00, 4:00). **Check all now** in Documents checks straight away. Any file whose saved time has changed is re-read, so edits to a TL workbook replace that week's shifts. A message names the files that were updated, and **Documents** shows each file's last-saved time.
 - note that edits made in SharePoint reach the synced folder only once OneDrive has downloaded them, usually within a minute or a few. For quickest updates, right-click the synced folder → **Always keep on this device**.
 - ignores Office lock files (`~$…`) and lists anything it couldn't use under **Documents → skipped**
 
