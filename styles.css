@@ -463,7 +463,8 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .oc-head { margin-bottom: 12px; }
 .oc-head th { width: 32%; background: #eee; }
 .oc-items thead th { background: #eee; }
-.oc-items .c { width: 32%; }
+.oc-items { table-layout: fixed; }
+.oc-items th, .oc-items td { width: 50%; }
 .oc-items td { height: 1.75em; }
 .oc-foot { margin-top: 14px; }
 .oc-foot th { width: 18%; background: #eee; white-space: nowrap; }
