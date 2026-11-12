@@ -422,3 +422,14 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
   .mgr-day .mgr-what { grid-column: 1 / -1; }
 }
 .mgr-bar [hidden] { display: none; }
+.mgr-hide { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font: inherit; font-size: .75rem; padding: 1px 8px; cursor: pointer; opacity: 0; transition: opacity .15s; }
+.mgr-day li:hover .mgr-hide, .mgr-grid tr:hover .mgr-hide, .mgr-hide:focus-visible { opacity: 1; }
+@media (hover: none) { .mgr-hide { opacity: 1; } }
+.mgr-hide:hover { color: var(--text); border-color: var(--gold); }
+.mgr-day li { grid-template-columns: 130px minmax(160px, 260px) 1fr auto; }
+.mgr-grid tbody th .mgr-hide { display: inline-block; margin-top: 4px; }
+.mgr-hidden { margin-top: 14px; font-size: .88rem; color: var(--muted); }
+.mgr-hidden summary { cursor: pointer; }
+.mgr-hidden ul { list-style: none; padding: 6px 0 0; margin: 0; }
+.mgr-hidden li { padding: 4px 0; display: flex; gap: 10px; align-items: baseline; }
+@media (max-width: 600px) { .mgr-day li { grid-template-columns: 90px 1fr auto; } }

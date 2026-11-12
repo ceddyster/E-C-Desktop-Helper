@@ -106,6 +106,7 @@ Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.x
 - **Click the window** to open the allocation on **today's roster**: everyone working, earliest start first, with their role and events, and who is off. ‹ / › move a day at a time, **Today** comes back.
 - **Week** shows Mon–Sun for everyone, with today highlighted (‹ / › move a week). Your name (⚙︎ Settings → My name) is highlighted.
 - **Person:** pick someone from the **Person** list, or click a name anywhere in the panel, to see just their roster for the week: each day's start time, events, RDOs and leave. ‹ / › move a week. Choose **Everyone** to go back.
+- **Hiding people you don't need:** hover over someone in the Day or Week view and click **Hide** (or use *Hide from the Managers views* on their roster). They're left off the main-page window and the day and week views for every week, and "N hidden" shows at the bottom. Open **N people hidden** and click **Unhide** to bring someone back. Hidden people can still be picked from the **Person** list (marked *hidden*). This is remembered in this browser.
 - **One allocation per week:** a re-saved or renamed copy of the same week replaces it. Weeks are cleared with the rest of the old data (⚙︎ Settings → keep months).
 
 ### TL Sheet → bar team roster
