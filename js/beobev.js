@@ -5,10 +5,15 @@
   const RANGE = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\b/;
   const hm = (h, m) => `${String(h).padStart(2, '0')}:${m}`;
 
-  /** A BEO's beverage lines → { from, to, items: [names] } (items empty if nothing is on consumption).
+  // "Assorted soft drinks and juices / orange juice" on a BEO means these, each counted on the sheet.
+  const SOFTS = ['Pepsi', 'Pepsi Max', 'Lemonade', 'Solo', 'Soda Water', 'Orange Juice', 'Apple Juice'];
+
+  /** A BEO's beverage lines → { has, from, to, items: [names] }. `has`: the BEO has a "Beverages on
+   *  consumption" line (pre-event drinks "included in beverage on consumption" alone don't count).
    *  "Leeuwin Estate Sparkling Brut @ $75.00 per bottle" → "Leeuwin Estate Sparkling Brut". */
   function fromBEO(lines) {
-    const out = { from: '', to: '', items: [] };
+    const out = { has: false, from: '', to: '', items: [] };
+    const add = (name) => { if (!out.items.some((x) => x.toLowerCase() === name.toLowerCase())) out.items.push(name); };
     let range = null, inOn = false;
     for (const raw of lines || []) {
       const t = String(raw).trim();
@@ -19,13 +24,16 @@
         // consumption" also count from their start time.
         if (range && (!out.from || range.from < out.from)) out.from = range.from;
         if (range && (!out.to || range.to > out.to)) out.to = range.to;
-        inOn = !/^included/i.test(t);
+        inOn = /beverages? on consumption/i.test(t) && !/^included/i.test(t);
+        if (inOn) out.has = true;
         continue;
       }
       if (!inOn) continue;
       if (/^\d+\s*@|beverage notes/i.test(t)) { inOn = false; continue; }
       const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/);
-      if (m && !out.items.some((x) => x.toLowerCase() === m[1].trim().toLowerCase())) out.items.push(m[1].trim());
+      if (!m) continue;
+      if (/assorted soft drinks?/i.test(m[1])) SOFTS.forEach(add);
+      else add(m[1].trim());
     }
     return out;
   }

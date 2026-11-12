@@ -44,8 +44,9 @@
       const iso = addDays(todayISO(), i);
       for (const e of (opts.events ? opts.events(iso) : [])) {
         if (e.setup) continue;
-        const on = B() && e.beo ? B().fromBEO(e.beo.beverage) : { items: [] };
-        out.push({ e, key: evKey(e), on });
+        // Only BEOs with a "Beverages on consumption" line in their Beverage section.
+        const on = B() && e.beo ? B().fromBEO(e.beo.beverage) : null;
+        if (on && on.has) out.push({ e, key: evKey(e), on });
       }
     }
     return out;
@@ -100,11 +101,10 @@
   function renderWin() {
     const body = $('ocWinList'); if (!body) return;
     const list = upcoming(2);
-    const withOn = list.filter((x) => x.on.items.length);
     $('ocWinSub').textContent = 'Check-off sheets from the BEO';
-    if (!list.length) { body.innerHTML = '<li class="win-empty">No events today or tomorrow. Click to make a sheet.</li>'; return; }
-    const show = withOn.length ? withOn : list;
-    body.innerHTML = (withOn.length ? '' : '<li class="win-empty">No beverages on consumption on today\'s or tomorrow\'s BEOs.</li>')
+    if (!list.length) { body.innerHTML = '<li class="win-empty">No BEOs with beverages on consumption today or tomorrow. Click to make a sheet by hand.</li>'; return; }
+    const show = list;
+    body.innerHTML = ''
       + show.slice(0, 6).map((x) => { const d = drafts[x.key];
         return `<li class="oc-li" data-oc-event="${esc(x.key)}"><div class="win-ev"><span>${esc(x.e.title)}</span><span class="t">${esc(x.e.date === todayISO() ? 'Today' : 'Tomorrow')}${x.on.from ? ' · ' + esc(t12(x.on.from)) : ''}</span></div>
           <div class="mgr-evs">${x.on.items.length ? `${x.on.items.length} item${x.on.items.length === 1 ? '' : 's'} on consumption` : 'nothing on consumption on the BEO'}${d && d.printedAt ? ` · <span class="oc-printed">✓ printed</span>` : d ? ' · draft saved' : ''}</div></li>`; }).join('');
@@ -164,7 +164,7 @@
   }
   function open(key) {
     const list = upcoming(2);
-    const first = list.find((x) => x.on.items.length) || list[0];
+    const first = list[0];
     $('ocDlg').showModal();
     load(key || (first ? first.key : 'new'));
   }
