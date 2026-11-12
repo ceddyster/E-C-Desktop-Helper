@@ -639,8 +639,16 @@
   const F = window.CrownFolder;
   let nextCheckAt = null;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
-  // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
+  // READER_VERSION: bumping it re-reads every file (kept at 15; prefer READERS below).
   const READER_VERSION = 15;
+  // One version per kind of file. Bump just the kind whose reader changed, so only those files are
+  // read again ("other" = files that weren't recognised, re-checked when a new kind is added).
+  const READERS = { tl: 1, beo: 1, cons: 1, mgr: 1, other: 1 };
+  const kindOf = (entry) => (entry.mgr ? 'mgr' : entry.cons ? 'cons' : entry.sheets[0].isTL ? 'tl' : entry.sheets[0].isBEO || entry.beoNumber ? 'beo' : 'other');
+  // Files read before kinds were recorded: worked out from what Documents says about them.
+  const kindFromInfo = (v) => { const d = (v && v.detail) || '';
+    return /^manager allocation/.test(d) ? 'mgr' : /^bar consumption/.test(d) ? 'cons' : /bar shifts$/.test(d) ? 'tl'
+      : (v && v.status === 'older') || /BEO|\bevents?\b/.test(d) ? 'beo' : 'other'; };
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';
@@ -695,7 +703,7 @@
   }
 
   async function rereadFolder(id) {
-    fstate(id).seen = {};
+    fstate(id).seen = {}; fstate(id).kind = {};
     await scanAll(true, id);
   }
 
@@ -720,8 +728,14 @@
   async function scanFolder(f, sum) {
     scanningId = f.id; scanProgress = ''; renderFolder();
     const st = fstate(f.id);
-    if (st.readerVersion !== READER_VERSION) { st.seen = {}; st.readerVersion = READER_VERSION; }
+    if (st.readerVersion !== READER_VERSION) { st.seen = {}; st.kind = {}; st.readerVersion = READER_VERSION; }
     st.files = st.files || {};
+    st.kind = st.kind || {};
+    for (const p of Object.keys(st.seen)) if (!st.kind[p]) st.kind[p] = kindFromInfo(st.files[p]);
+    // A reader improved since the last check: read just that kind of file again.
+    const was = st.readers || READERS;
+    for (const p of Object.keys(st.seen)) if (was[st.kind[p]] !== READERS[st.kind[p]]) delete st.seen[p];
+    st.readers = Object.assign({}, READERS);
     try {
       // Only look at what can hold data we're keeping: from the start of the oldest period kept
       // (with the default setting, 1 July of last financial year).
@@ -731,6 +745,7 @@
       st.skippedDirs = files.skippedDirs || [];
       const present = new Set(files.map((x) => x.path));
       for (const k of Object.keys(st.files)) if (!present.has(k)) delete st.files[k];
+      for (const k of Object.keys(st.seen)) if (!present.has(k)) { delete st.seen[k]; delete st.kind[k]; }
       const cutoff = Date.now() - FIRST_SCAN_DAYS * 864e5;
       const todo = [];
       for (const x of files) {
@@ -782,11 +797,13 @@
             st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO, consumption or manager allocation workbook' };
           }
           st.seen[x.path] = x.lastModified;
+          st.kind[x.path] = entry.auto ? kindOf(entry) : 'other';
         } catch (e) {
           if (/doesn't look like a BEO|looks like a TL Sheet but has no bar tabs|shortcut/i.test(e.message)) {
             // Readable, just not one of ours (contracts, banquet checks…): note it and don't re-read it at every check.
             st.files[x.path] = { status: 'skipped', detail: e.message.replace(/^This PDF doesn't look like a BEO.*$/, 'PDF that isn\'t a BEO') };
             st.seen[x.path] = x.lastModified;
+            st.kind[x.path] = 'other';
           } else {
             // Not marked as seen, so it's tried again next time (e.g. a file still syncing).
             st.files[x.path] = { status: 'error', detail: e.message };

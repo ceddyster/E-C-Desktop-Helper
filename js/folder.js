@@ -50,24 +50,32 @@
   // (e.g. "2024", "FY24", "2023-24", "June 2025" when keeping from 1 July 2025). Their names go in out.skippedDirs.
   async function list(h, prefix = '', depth = 0, out = [], opts = {}) {
     if (!out.skippedDirs) out.skippedDirs = [];
+    const files = [], dirs = [];
     for await (const [name, entry] of h.entries()) {
       if (name.startsWith('~$') || name.startsWith('.')) continue;
       if (entry.kind === 'directory') {
         const end = opts.before ? periodEnd(`${prefix}${name}`) : null;
         if (end && end < opts.before) { out.skippedDirs.push(prefix + name); continue; }
-        if (depth < MAX_DEPTH) await list(entry, `${prefix}${name}/`, depth + 1, out, opts);
-      } else if (WANT.test(name)) {
+        if (depth < MAX_DEPTH) dirs.push([name, entry]);
+      } else if (WANT.test(name)) files.push([name, entry]);
+    }
+    // Asking for each file's saved time is the slow part (more so for OneDrive files), so ask for
+    // up to 16 at once. Only the saved time is looked at here; a file's contents are read later,
+    // and only if it's new or has changed.
+    for (let i = 0; i < files.length; i += 16) {
+      out.push(...await Promise.all(files.slice(i, i + 16).map(async ([name, entry]) => {
         try {
           const file = await entry.getFile();
           const item = { path: prefix + name, name, lastModified: file.lastModified, file };
           if (/\.url$/i.test(name)) item.target = shortcutTarget(await file.text());
-          out.push(item);
+          return item;
         } catch (e) {
           // Usually a cloud-only file OneDrive couldn't fetch right now. Reported, and tried again next check.
-          out.push({ path: prefix + name, name, error: e.message || String(e) });
+          return { path: prefix + name, name, error: e.message || String(e) };
         }
-      }
+      })));
     }
+    for (const [name, entry] of dirs) await list(entry, `${prefix}${name}/`, depth + 1, out, opts);
     return out;
   }
 
