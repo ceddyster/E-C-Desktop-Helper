@@ -484,3 +484,19 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
   #ocPrint .oc-sheet:last-child { break-after: auto; }
   #ocPrint .oc-items tr { break-inside: avoid; }
 }
+
+/* Desktop: every card on one screen, no page scrolling. Three cards across, two rows, filling the
+   window under the header; a card with more than fits scrolls inside itself. */
+@media (min-width: 1000px) and (min-height: 540px) {
+  body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  body > .topbar, body > .err-banner { flex: 0 0 auto; }
+  .grid { flex: 1 1 auto; min-height: 0; max-width: none; width: 100%; padding: 14px 20px 16px; gap: 14px;
+    grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+  .grid > .card { min-height: 0; padding: 14px 16px; }
+  .grid > .win { grid-column: span 1; overflow: hidden; }
+  .win-head { margin-bottom: 8px; }
+  .win > :last-child { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .win-days { grid-template-columns: 1fr; gap: 10px; }
+  .win-list li { padding: 7px 0; }
+  .placeholder { min-height: 0; }
+}
