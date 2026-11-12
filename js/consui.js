@@ -233,6 +233,11 @@
       const ok = okMap[okKey(type, e)];
       return `<li>${line(e)} · <span class="ok-tag">${esc(CHECKS[type].okTag)}</span>${ok.note ? ` · <i>${esc(ok.note)}</i>` : ''} <span class="muted small">(checked ${esc(new Date(ok.at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }))})</span> <button class="linkbtn" type="button" data-ok-undo="${esc(okKey(type, e))}">undo</button></li>`;
     }).join('')}</ul></details>`;
+    // Workbooks whose Summary date didn't match the folder they're in (filed by the folder instead).
+    const misdated = Object.values(cache).filter((d) => (d.warnings || []).some((w) => /doesn't match where the file is kept/.test(w)) && d.date >= sel.from && d.date <= sel.to);
+    if (misdated.length) html += `<details class="ok-list"><summary>📅 ${misdated.length} workbook${misdated.length === 1 ? '' : 's'} with the wrong date on the Summary tab (filed by folder instead)</summary><ul>${misdated.sort((a, b) => a.date.localeCompare(b.date)).map((d) => {
+      const said = ((d.warnings || []).find((w) => /doesn't match where the file is kept/.test(w)).match(/\((\d{4}-\d{2}-\d{2})\)/) || [])[1];
+      return `<li><b>${esc(d.file || 'workbook')}</b> for ${esc(fmtDay(d.date))}${said ? ` · its Summary says ${esc(fmtDay(said))}` : ''}</li>`; }).join('')}</ul></details>`;
     $('consAlerts').innerHTML = html;
     $('consCards').innerHTML = (sel.rowFiltered
       ? [['Units used', int(s.units)], ['On-consumption value', money(s.charge)], ['Cost', money(s.rowCost)], ['Events', int(s.events)]]

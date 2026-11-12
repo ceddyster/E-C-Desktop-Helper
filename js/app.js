@@ -460,8 +460,8 @@
   let pending = []; // [{fileName, sheets:[analysed]}]
 
   /** Reads one file into an import entry. `auto` = safe to import without review (TL, BEO, .ics). */
-  async function prepare(name, buf) {
-    const sheets = await P.readFile(name, buf);
+  async function prepare(name, buf, path) {
+    const sheets = await P.readFile(name, buf, path);
     const first = sheets[0] || {};
     if (first.isTL) {
       // TL workbooks are weekly ("TL 26.10.2026-1.11.2026.xlsx"): one source per week, and a
@@ -610,6 +610,8 @@
       state.events.push(...events); state.shifts.push(...shifts);
       const src = { id, name: file.displayName || file.fileName, loadedAt: new Date().toISOString(), events: events.length, shifts: shifts.length, fromFolder: !!file.fromFolder, fileSaved: file.fileSaved || null, path: file.path || null, beoCreated: file.beoCreated || null };
       if (file.cons) {
+        // The same file read before under a different date (e.g. a wrong Summary date): replace that record.
+        if (file.path) for (const old of state.sources.filter((x) => x.cons && x.path === file.path && x.id !== id)) removeSource(old.id, true);
         // Older versions stored one record per date ("src:cons:2026-07-05"); replace it.
         if (file.cons.date && state.sources.some((x) => x.id === 'src:cons:' + file.cons.date)) removeSource('src:cons:' + file.cons.date, true);
         // Consumption data lives in IndexedDB; the source entry just records it.
@@ -644,7 +646,7 @@
   const READER_VERSION = 15;
   // One version per kind of file. Bump just the kind whose reader changed, so only those files are
   // read again ("other" = files that weren't recognised, re-checked when a new kind is added).
-  const READERS = { tl: 1, beo: 1, cons: 1, mgr: 1, other: 2 };
+  const READERS = { tl: 1, beo: 1, cons: 2, mgr: 1, other: 2 };
   const kindOf = (entry) => (entry.mgr ? 'mgr' : entry.cons ? 'cons' : entry.sheets[0].isTL ? 'tl' : entry.sheets[0].isBEO || entry.beoNumber ? 'beo' : 'other');
   // Files read before kinds were recorded: worked out from what Documents says about them.
   const kindFromInfo = (v) => { const d = (v && v.detail) || '';
@@ -787,12 +789,12 @@
         scanProgress = `${n + 1}/${todo.length}`; renderFolder();
         await pause();
         try {
-          const entry = await prepare(x.name, await x.file.arrayBuffer());
+          const entry = await prepare(x.name, await x.file.arrayBuffer(), x.path);
           if (entry.auto) {
             Object.assign(entry, { fromFolder: true, fileSaved: x.lastModified, path: x.path, wasSeen: st.seen[x.path] != null });
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
             st.files[x.path] = { status: 'loaded', saved: x.lastModified,
-              detail: entry.mgr ? `manager allocation · week of ${fmtShort(entry.mgr.weekStart)} · ${entry.mgr.people.length} managers` : entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units${(entry.cons.warnings || []).length ? ' · ⚠ ' + entry.cons.warnings.join(' ') : ''}` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
+              detail: entry.mgr ? `manager allocation · week of ${fmtShort(entry.mgr.weekStart)} · ${entry.mgr.people.length} managers` : entry.cons ? `bar consumption · ${entry.cons.date ? fmtLong(entry.cons.date) + ' · ' : ''}${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units${(entry.cons.warnings || []).length ? ' · ⚠ ' + entry.cons.warnings.join(' ') : ''}` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
             batch.push(entry);
           } else {
             st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO, consumption or manager allocation workbook' };

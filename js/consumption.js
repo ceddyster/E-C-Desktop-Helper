@@ -121,7 +121,25 @@
   }
 
   /** Parses a consumption workbook → { date, events: [...], rows: [...] }. */
-  function read(wb, fileName) {
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  /** The report's day from where the file is kept: "2026/05 - May/30.xlsm" → 2026-05-30. Needs a year folder,
+   *  a month folder and a day in the file name; otherwise ''. */
+  function dateFromPath(path) {
+    const parts = String(path || '').split('/').filter(Boolean);
+    if (parts.length < 3) return '';
+    const day = parts[parts.length - 1].match(/^\s*(\d{1,2})(?!\d)/);
+    const monDir = parts[parts.length - 2].toLowerCase();
+    let mon = MONTHS.findIndex((m) => new RegExp(`(^|[^a-z])${m}`).test(monDir));
+    if (mon < 0) { const n = monDir.match(/^\s*(\d{1,2})(?!\d)/); if (n && +n[1] >= 1 && +n[1] <= 12) mon = +n[1] - 1; }
+    let year = null;
+    for (const p of parts.slice(0, -2)) { const y = p.match(/\b(20\d{2})\b/); if (y) year = +y[1]; }
+    if (!day || mon < 0 || !year || +day[1] < 1 || +day[1] > 31) return '';
+    const d = new Date(year, mon, +day[1]);
+    if (d.getMonth() !== mon) return '';
+    return `${year}-${String(mon + 1).padStart(2, '0')}-${String(+day[1]).padStart(2, '0')}`;
+  }
+
+  function read(wb, fileName, path) {
     const events = [], rows = [], warnings = [];
     let wbDate = '';
     // Hidden tabs (e.g. an old event tab left in a workbook copied from another day) aren't part of this
@@ -178,13 +196,21 @@
       events.push(ev);
       rows.push(...evRows);
     }
-    // The report's day: Summary A1, checked against the day in the file name ("04.xlsm" = the 4th).
-    const fd = String(fileName || '').replace(/^.*[\\/]/, '').match(/^\s*(\d{1,2})(?!\d)/);
-    if (fd && wbDate && +fd[1] >= 1 && +fd[1] <= 31 && +wbDate.slice(8, 10) !== +fd[1]) {
-      const fixed = `${wbDate.slice(0, 8)}${String(+fd[1]).padStart(2, '0')}`;
-      if (global.CrownParse.toISODate(fixed) === fixed) {
-        warnings.push(`The Summary date (${wbDate}) doesn't match the file name (day ${+fd[1]}), so ${fixed} was used.`);
-        wbDate = fixed;
+    // The report's day. Where the file is kept (year / month folder / day file) is the surest guide: a
+    // workbook copied from another day can keep that day's date on its Summary tab. Without that, Summary A1,
+    // checked against the day in the file name ("04.xlsm" = the 4th).
+    const pd = dateFromPath(path);
+    if (pd) {
+      if (pd !== wbDate) warnings.push(wbDate ? `The Summary tab's date (${wbDate}) doesn't match where the file is kept, so ${pd} was used. Check cell A1 on the Summary tab.` : `No date on the Summary tab, so ${pd} (from where the file is kept) was used.`);
+      wbDate = pd;
+    } else {
+      const fd = String(fileName || '').replace(/^.*[\\/]/, '').match(/^\s*(\d{1,2})(?!\d)/);
+      if (fd && wbDate && +fd[1] >= 1 && +fd[1] <= 31 && +wbDate.slice(8, 10) !== +fd[1]) {
+        const fixed = `${wbDate.slice(0, 8)}${String(+fd[1]).padStart(2, '0')}`;
+        if (global.CrownParse.toISODate(fixed) === fixed) {
+          warnings.push(`The Summary date (${wbDate}) doesn't match the file name (day ${+fd[1]}), so ${fixed} was used.`);
+          wbDate = fixed;
+        }
       }
     }
     if (!wbDate) wbDate = events.map((e) => e.date).filter(Boolean).sort()[0] || '';
@@ -198,7 +224,7 @@
       e.date = wbDate || e.date;
     });
     if (skippedHidden.length) warnings.push(`Skipped ${skippedHidden.length} hidden tab${skippedHidden.length === 1 ? '' : 's'}: ${skippedHidden.join(', ')}.`);
-    return { date: wbDate, file: fileName, events, rows, warnings };
+    return { date: wbDate, file: path || fileName, events, rows, warnings };
   }
 
   /* ---------- Storage (IndexedDB, one record per day) ---------- */
@@ -230,5 +256,5 @@
     });
   }
 
-  global.CrownCons = { isConsumptionWorkbook, read, put, remove, clear, all };
+  global.CrownCons = { isConsumptionWorkbook, read, dateFromPath, put, remove, clear, all };
 })(window);

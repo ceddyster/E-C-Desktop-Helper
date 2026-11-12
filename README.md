@@ -64,6 +64,9 @@ This needs Microsoft Edge or Google Chrome. The browser may ask for permission a
 
 ### Bar consumption workbooks → totals
 
+
+- **The day comes from where the file is kept**: year folder, month folder and day file (*2026/05 - May/30.xlsm* is 30 May 2026). If the Summary tab's date (A1) says something else, e.g. a workbook copied from another day and not updated, the folder wins. The totals panel lists such workbooks under *📅 wrong date on the Summary tab* so the date can be corrected. Files outside a year/month folder still use the Summary date, checked against the day in the file name.
+
 Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **Documents → Link another folder**, or load one with **Load documents**. They're recognised by the "Banquet Consumption Report" blocks (`js/consumption.js`):
 
 - **Each event tab:** the event details are read (BEO #, date, name, pax, room, event type, event / service manager, DM), plus every product used in each **bar block** (bar name, category, size, opening, transfer, closing, used, charge, cost).

@@ -273,7 +273,7 @@
 
   /* ---------- Files ---------- */
 
-  async function readSpreadsheet(name, buf) {
+  async function readSpreadsheet(name, buf, path) {
     if (!global.XLSX) throw new Error('Spreadsheet library failed to load.');
     // Big workbooks full of drawings/buttons: drop those parts first so reading takes seconds, not minutes.
     if (global.CrownSlim && /\.(xlsx|xlsm|xlsb)$/i.test(name)) buf = await global.CrownSlim.slim(buf);
@@ -307,7 +307,7 @@
       // Banquet consumption workbooks: recognised from row 1 ("Banquet Consumption Report").
       const peek = global.XLSX.read(buf, { type: 'array', sheetRows: 1 });
       if (global.CrownCons.isConsumptionWorkbook(peek)) {
-        const data = global.CrownCons.read(global.XLSX.read(buf, { type: 'array', cellDates: true }), name);
+        const data = global.CrownCons.read(global.XLSX.read(buf, { type: 'array', cellDates: true }), name, path);
         const units = data.rows.reduce((s, x) => s + x.used, 0);
         return [{ label: `Bar consumption · ${data.events.length} event${data.events.length === 1 ? '' : 's'} · ${Math.round(units)} units`,
           kind: 'ready', isCons: true, cons: data,
@@ -358,7 +358,8 @@
   }
 
   /** Reads one file → [{label, kind, ...sheet}] or a ready result for ics/json. */
-  async function readFile(name, buf) {
+  /** `path`: where the file sits in a linked folder ("2026/05 - May/30.xlsm"), when known. */
+  async function readFile(name, buf, path) {
     const ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'pdf') return global.CrownBEO.readBEO(name, buf);
     if (ext === 'url' || ext === 'website') throw new Error('that\'s a shortcut (.url), not the workbook, so it can\'t be read. Link the synced SharePoint folder instead (see Documents), or download a copy of the TL Sheet and load the .xlsx.');
@@ -370,7 +371,7 @@
       const data = JSON.parse(new TextDecoder().decode(buf));
       return [{ label: '', kind: 'ready', ready: { events: data.events || [], shifts: data.shifts || [], warnings: [] } }];
     }
-    return readSpreadsheet(name, buf);
+    return readSpreadsheet(name, buf, path);
   }
 
   global.CrownParse = { readFile, analyseRows, build, toISODate, toTime, parseRange, parseIcs, FIELD_NAMES, isoOf };
