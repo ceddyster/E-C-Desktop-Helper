@@ -10,7 +10,7 @@
   const pad = (n) => String(n).padStart(2, '0');
   const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseISO = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-  const fmtDay = (iso) => (iso ? parseISO(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' }) : '—');
+  const fmtDay = (iso) => (iso ? parseISO(iso).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '—');
   const fmtDayY = (iso) => parseISO(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
   const money = (n) => (n == null || !isFinite(n) ? '—' : n.toLocaleString('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }));
   const int = (n) => Math.round(n || 0).toLocaleString('en-AU');
@@ -85,11 +85,19 @@
     const q = ui.search.trim().toLowerCase();
     // Search: if it matches an event (name, BEO #, room, managers, type), show those events — including
     // ones that used no stock. Otherwise it searches products, categories and bars.
-    const evText = (e) => `${e.event} ${e.beo} ${e.room} ${e.em} ${e.sm} ${e.dm} ${e.type}`.toLowerCase();
-    const evSearch = !!q && events.some((e) => evOk(e) && evText(e).includes(q));
-    const evOk2 = (e) => evOk(e) && (!evSearch || evText(e).includes(q));
+    const dateText = (d) => {
+      if (!d) return '';
+      const x = parseISO(d), long = x.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return `${long} ${fmtDay(d)} ${d} ${x.getDate()}/${x.getMonth() + 1}/${x.getFullYear()} ${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`.replace(/,/g, '');
+    };
+    const evText = (e) => `${e.event} ${e.beo} ${e.room} ${e.em} ${e.sm} ${e.dm} ${e.type} ${dateText(e.date)}`.toLowerCase();
+    // Every word typed must appear ("udia 2026", "sept 2025"), in any order.
+    const terms = q.split(/\s+/).filter(Boolean);
+    const hit = (text) => terms.every((t) => text.includes(t));
+    const evSearch = !!q && events.some((e) => evOk(e) && hit(evText(e)));
+    const evOk2 = (e) => evOk(e) && (!evSearch || hit(evText(e)));
     const rowOk = (r) => evOk2(r.e) && ui.filters.every((f) => !GROUPS[f.g].row || GROUPS[f.g].key(r) === f.v)
-      && (!q || evSearch || `${r.prod} ${r.cat} ${r.bar}`.toLowerCase().includes(q));
+      && (!q || evSearch || hit(`${r.prod} ${r.cat} ${r.bar} ${evText(r.e)}`.toLowerCase()));
     const rowFiltered = (!!q && !evSearch) || ui.filters.some((f) => GROUPS[f.g].row);
     const selRows = rows.filter(rowOk);
     const selEvents = rowFiltered ? [...new Map(selRows.map((r) => [r.e.key, r.e])).values()] : events.filter(evOk2);
