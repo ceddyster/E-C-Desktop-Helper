@@ -193,7 +193,19 @@
       <option value="none" ${current === 'none' ? 'selected' : ''}>Not on a BEO (keep separate)</option>
     </select>`;
   }
-  function eventsOn(iso) { return dayEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e)); }
+  /* Events that don't relate to the bar team can be hidden: one by one ("Hide"), or automatically when a
+   * BEO has no bar staff on the TL sheet (Settings). Hidden events stay off the Today window, calendar
+   * and day view; the day view can show them again. */
+  const hideKey = (e) => (e.beo ? `beo|${e.beo.number || e.id}|${e.date}` : `tl|${e.date}|${M.key(e.title)}`);
+  const autoHidden = (e) => !!state.hideNoStaff && !!e.beo && !(e.barStaff || []).length && !(e.missing || []).length;
+  const isHidden = (e) => !!(state.hidden || {})[hideKey(e)] || autoHidden(e);
+  function visibleEvents(iso) { return dayEvents(iso).filter((e) => !isHidden(e)); }
+  function eventsOn(iso) { return visibleEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e)); }
+  function setHidden(key, on) {
+    state.hidden = state.hidden || {};
+    if (on) state.hidden[key] = new Date().toISOString().slice(0, 10); else delete state.hidden[key];
+    save(); render();
+  }
   /** Two TL files covering the same day (e.g. an old copy of the week): only the newest one counts for that day. */
   function tlSourceFor(iso) {
     const ids = new Set();
@@ -244,7 +256,9 @@
     $('dailyDate').textContent = fmtLong(iso);
     const noData = !state.events.length && !state.shifts.length;
 
-    const evs = eventsOn(iso);
+    const all = dayEvents(iso).filter((e) => !view.onlyMine || eventIsMine(e));
+    const hiddenHere = all.filter(isHidden);
+    const evs = view.showHidden ? all : all.filter((e) => !isHidden(e));
     // Each event is a row: event details on the left, the people working it (and unfilled spots) on the right.
     // Who is on more than one event today (e.g. listed on two bar tabs at the same time).
     const onEvents = new Map();
@@ -253,6 +267,9 @@
     // Shifts that don't belong to any event shown (e.g. from a plain roster) go in a last row.
     const placed = new Set(dayEvents(iso).flatMap((e) => (e.barStaff || []).map((d) => `${d.name}|${d.start}`)));
     const other = shiftsOn(iso).filter((x) => !placed.has(`${x.person}|${x.start}`) && (!view.onlyMine || isMe(x.person)));
+    if (hiddenHere.length) rows.push(`<li class="hidden-note">${view.showHidden
+      ? `Showing ${hiddenHere.length} hidden event${hiddenHere.length === 1 ? '' : 's'}. <button class="linkbtn" type="button" data-show-hidden="0">Hide them again</button>`
+      : `${hiddenHere.length} event${hiddenHere.length === 1 ? '' : 's'} hidden. <button class="linkbtn" type="button" data-show-hidden="1">Show</button>`}</li>`);
     if (other.length) rows.push(`<li class="day-row"><div class="day-ev"><div class="event-card other-card"><div class="event-title">Other shifts</div><div class="event-meta">Rostered, but not linked to an event</div></div></div>
       <ul class="shift-list">${other.map((x) => personRow({ name: x.person, start: x.start, end: x.end, label: x.label, bar: x.venue, sub: x.duty || x.role })).join('')}</ul></li>`);
     $('dailyEvents').innerHTML = rows.length ? rows.join('')
@@ -292,7 +309,7 @@
   function renderTodayWin() {
     const iso = todayISO();
     $('todayWinDate').textContent = fmtLong(iso);
-    const evs = dayEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));   // set-up teams last
+    const evs = visibleEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));   // set-up teams last
     const noData = !state.events.length && !state.shifts.length;
     $('todayWinList').innerHTML = evs.length ? evs.map((e) => {
       const st = staffOf(e).sort((a, b) => (a.start || '99').localeCompare(b.start || '99'));
@@ -306,7 +323,7 @@
   function renderCalWin() {
     const days = [todayISO(), addDays(todayISO(), 1)];
     $('calWinDays').innerHTML = days.map((iso, i) => {
-      const evs = dayEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));
+      const evs = visibleEvents(iso).sort((a, b) => (a.setup ? 1 : 0) - (b.setup ? 1 : 0));
       const items = evs.length ? evs.map((e) => {
         const st = staffOf(e), from = st.map((d) => d.start).filter(Boolean).sort()[0];
         if (e.setup) return `<li class="win-setup-line"><span class="t">${e.start ? fmtTime(e.start) : ''}</span>Set up team<span class="sub">${st.length} staff</span></li>`;
@@ -337,7 +354,11 @@
       `<tr><td>${f.date && f.date !== e.date ? `<b>${esc(fmtShort(f.date))}</b> ` : ''}${f.start ? fmtTime(f.start) + '–' + fmtTime(f.end) : ''}</td><td>${esc(f.event)}</td><td>${esc(f.venue)}</td><td>${f.gtd ? f.gtd + ' gtd' : ''}</td></tr>`).join('')}</table></details>` : '';
     const bev = b && b.beverage && b.beverage.length ? `<details class="more-info"><summary>Beverage</summary><ul>${b.beverage.map((l) =>
       /^\d{1,2}:\d{2}\s*-/.test(l) ? `<li class="sub">${esc(l)}</li>` : `<li>${esc(l)}</li>`).join('')}</ul></details>` : '';
-    return `<div class="event-card ${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''}">
+    const hidden = isHidden(e);
+    const hideBtn = hidden
+      ? ((state.hidden || {})[hideKey(e)] ? `<button class="btn ghost sm hide-btn" type="button" data-unhide="${esc(hideKey(e))}">Unhide</button>` : '<span class="muted small hide-btn">Hidden: no bar staff</span>')
+      : `<button class="btn ghost sm hide-btn" type="button" data-hide="${esc(hideKey(e))}" title="Hide this event from your dashboard">Hide</button>`;
+    return `<div class="event-card ${eventIsMine(e) ? 'mine' : ''} ${e.noBEO ? 'nobeo' : ''} ${hidden ? 'is-hidden' : ''}">${hideBtn}
       <div class="event-time">${e.start ? fmtTime(e.start) : 'All day'}${e.end ? `<small>to ${fmtTime(e.end)}</small>` : ''}</div>
       <div>
         <div class="event-title">${esc(e.title)}${e.setup ? (/^set up team$/i.test(e.title) ? '' : ' <span class="tag">Set up team</span>') : e.noBEO ? ` <span class="tag">${e.manualNone ? 'TL only' : 'TL only · no matching BEO'}</span>` : ''}</div>
@@ -596,7 +617,7 @@
   const F = window.CrownFolder;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 11;
+  const READER_VERSION = 12;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';
@@ -739,8 +760,14 @@
           }
           st.seen[x.path] = x.lastModified;
         } catch (e) {
-          // Not marked as seen, so it's tried again next time (e.g. a file still syncing).
-          st.files[x.path] = { status: 'error', detail: e.message };
+          if (/doesn't look like a BEO|looks like a TL Sheet but has no bar tabs|shortcut/i.test(e.message)) {
+            // Readable, just not one of ours (contracts, banquet checks…): note it and don't re-read it every minute.
+            st.files[x.path] = { status: 'skipped', detail: e.message.replace(/^This PDF doesn't look like a BEO.*$/, 'PDF that isn\'t a BEO') };
+            st.seen[x.path] = x.lastModified;
+          } else {
+            // Not marked as seen, so it's tried again next time (e.g. a file still syncing).
+            st.files[x.path] = { status: 'error', detail: e.message };
+          }
         }
         if (batch.length >= 8) flush();
       }
@@ -806,9 +833,18 @@
           <button class="btn sm danger" type="button" data-folder="unlink" data-id="${f.id}">Unlink</button>
         </div>
         ${shortcutHelp}
-        ${(st.skippedDirs || []).length ? `<details><summary>Older folders skipped: ${st.skippedDirs.length}</summary><ul>${st.skippedDirs.map((d) => `<li><b>${esc(d)}</b></li>`).join('')}</ul><p class="muted small">Their names show they only hold material from before ${esc(fmtShort(consCutoff(state.consKeep)))}, so they aren't opened. This follows the "Keep bar consumption data for" setting.</p></details>` : ''}
-        ${summary.map(([k, g]) => `<details ${k === 'error' ? 'open' : ''}><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
-          `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
+        <p class="folder-sum">${[
+          group('loaded').length && `${group('loaded').length} loaded`,
+          group('error').length && `<span class="warn-text">${group('error').length} couldn't be read</span>`,
+          group('older').length && `${group('older').length} older BEO copies ignored`,
+          group('skipped').length && `${group('skipped').length} other files`,
+          (group('old').length + (st.skippedDirs || []).length) && `older files and folders skipped`,
+        ].filter(Boolean).join(' · ') || 'No files read yet'}</p>
+        ${summary.length || (st.skippedDirs || []).length ? `<details class="file-details"><summary>File details</summary>
+          ${summary.map(([k, g]) => `<details><summary>${LABEL[k]}: ${g.length}</summary><ul>${g.slice(0, 150).map(([path, v]) =>
+            `<li><b>${esc(path)}</b>${v.detail && k !== 'shortcut' ? ` · ${esc(v.detail)}` : ''}${v.saved ? ` · saved ${esc(fmtSaved(v.saved))}` : ''}</li>`).join('')}${g.length > 150 ? `<li>…and ${g.length - 150} more</li>` : ''}</ul></details>`).join('')}
+          ${(st.skippedDirs || []).length ? `<details><summary>Older folders skipped: ${st.skippedDirs.length}</summary><ul>${st.skippedDirs.map((d) => `<li><b>${esc(d)}</b></li>`).join('')}</ul></details>` : ''}
+        </details>` : ''}
       </div>`;
     });
     panel.innerHTML = `${boxes.join('')}
@@ -841,6 +877,7 @@
 
   function renderSources() {
     renderFolder();
+    $('sourceCountAll').textContent = state.sources.length;
     $('sourceList').innerHTML = state.sources.length ? state.sources.map((s) => `<li>
       <div><div>${esc(s.name)}</div><div class="meta">${s.cons ? `${s.events} events · ${(s.units || 0).toLocaleString('en-AU')} units used` : `${s.events} events · ${s.shifts} shifts`}${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
@@ -912,10 +949,11 @@
     };
     $('btnSample').onclick = loadSample;
 
-    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('consKeep').value = String(state.consKeep); $('consKeepNote').textContent = consCutoff(state.consKeep) ? `Currently keeping from ${fmtLong(consCutoff(state.consKeep))}.` : 'Kept forever.'; $('settingsDlg').showModal(); };
+    $('btnSettings').onclick = () => { $('myName').value = state.myName; $('keepMonths').value = String(state.keepMonths); $('hideNoStaff').checked = !!state.hideNoStaff; $('consKeep').value = String(state.consKeep); $('consKeepNote').textContent = consCutoff(state.consKeep) ? `Currently keeping from ${fmtLong(consCutoff(state.consKeep))}.` : 'Kept forever.'; $('settingsDlg').showModal(); };
     $('btnSaveSettings').onclick = () => {
       state.myName = $('myName').value.trim();
       state.keepMonths = +$('keepMonths').value;
+      state.hideNoStaff = $('hideNoStaff').checked;
       const ck = $('consKeep').value; state.consKeep = /^fy/.test(ck) ? ck : +ck;
       const clearedDays = pruneCons();
       if (clearedDays) toast(`Cleared ${clearedDays} day${clearedDays === 1 ? '' : 's'} of bar consumption from before ${fmtLong(consCutoff(state.consKeep))} (keeping ${consKeepLabel(state.consKeep)}). Your files weren't touched.`);
@@ -982,6 +1020,13 @@
       }
     }, true);
     document.addEventListener('click', (e) => {
+      const hb = e.target.closest('[data-hide], [data-unhide], [data-show-hidden]');
+      if (hb) {
+        if (hb.dataset.hide) { setHidden(hb.dataset.hide, true); toast('Event hidden. Use "Show" at the bottom of the day to bring it back.'); }
+        else if (hb.dataset.unhide) setHidden(hb.dataset.unhide, false);
+        else { view.showHidden = hb.dataset.showHidden === '1'; render(); }
+        return;
+      }
       const d = e.target.closest('[data-date]');
       if (d) { if (d.closest('#calDlg')) openDay(d.dataset.date); else selectDate(d.dataset.date); }
       if (e.target.closest('[data-act="load"]')) pickLocal();

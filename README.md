@@ -5,6 +5,7 @@ A single-page dashboard for daily and weekly Crown work:
 The main page is a one-page summary made of small windows. Click a window to open its full view.
 
 - **Today**: each event's name, the bar staff working it, and the time each person starts. Click it for the full day view: one row per event, with the event details (BEO, function times, beverage, after-event jobs) on the left and the people working it (plus any unfilled spots) on the right. Use ‹ / › to move between days.
+- **Hiding events that aren't yours:** each event in the full Today view has a **Hide** button, and hidden events stay off the Today window and calendar too. "N events hidden · Show" at the bottom of a day brings them back, where each can be unhidden. ⚙︎ Settings → **Hide BEO events with no bar staff on the TL sheet** does this automatically.
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
 - **Bar consumption**: this week's units used, beverage revenue, cost and cost %, plus the most-used products. Click it for the totals panel (see below).
 - **3 empty add-on slots** for future features.
@@ -39,6 +40,8 @@ Set your name in **⚙︎ Settings** so your shifts and events are highlighted.
 Example files to try are in `samples/`. **Documents → Load sample data** fills the dashboard with demo data.
 
 ### Linked folders (automatic)
+
+**Documents** shows each linked folder with a one-line summary, e.g. *45 loaded · 194 older BEO copies ignored*. The per-file lists are under **File details**, and every loaded document is under **All loaded documents**. PDFs that aren't BEOs (contracts, banquet checks) are noted once and not re-read on every check.
 
 Click **📁 Link folder** and choose a folder where TL Sheets or BEOs are saved. You can link several, e.g. the synced SharePoint TL folder and a folder you save BEOs into: **Documents → Link another folder**. Each folder has its own Re-read, Change folder and Unlink buttons. Sub-folders up to 6 levels deep are included, so link the top folder. From then on, the dashboard:
 

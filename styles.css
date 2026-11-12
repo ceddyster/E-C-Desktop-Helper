@@ -356,3 +356,18 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .ok-list summary { cursor: pointer; color: var(--mine); font-weight: 600; }
 .ok-list ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
 .ok-tag { color: var(--mine); font-size: .78rem; font-weight: 600; white-space: nowrap; }
+
+/* Hiding events */
+.event-card { position: relative; }
+.hide-btn { position: absolute; top: 8px; right: 8px; font-size: .78rem; padding: 2px 8px; color: var(--muted); }
+.event-card .event-title { padding-right: 60px; }
+.event-card.is-hidden { opacity: .55; }
+.hidden-note { list-style: none; color: var(--muted); font-size: .85rem; padding: 4px 0 8px; }
+.toggle.setting { margin: 12px 0 2px; color: var(--text); font-size: .9rem; }
+/* Documents: folders first, file lists tucked away */
+.folder-sum { margin: 8px 0 0; font-size: .88rem; }
+.file-details { margin-top: 6px; }
+.file-details > summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
+.file-details details { margin-left: 10px; }
+.all-docs { margin-top: 14px; font-size: .88rem; }
+.all-docs > summary { cursor: pointer; color: var(--muted); }

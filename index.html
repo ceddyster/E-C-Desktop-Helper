@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-08b">
+  <link rel="stylesheet" href="styles.css?v=2026-11-12a">
 </head>
 <body>
   <header class="topbar">
@@ -191,8 +191,10 @@
         <button class="btn ghost sm" value="close" aria-label="Close">✕</button>
       </div>
       <div id="folderPanel"></div>
-      <h3 class="label" style="margin-top:14px">Loaded</h3>
-      <ul class="source-list" id="sourceList"></ul>
+      <details class="all-docs">
+        <summary>All loaded documents (<span id="sourceCountAll">0</span>)</summary>
+        <ul class="source-list" id="sourceList"></ul>
+      </details>
       <div class="dlg-foot">
         <button class="btn" type="button" id="btnSample">Load sample data</button>
         <button class="btn danger" type="button" id="btnClear">Clear everything</button>
@@ -221,6 +223,8 @@
         </select>
       </label>
       <p class="muted small">Older ones are cleared from the dashboard automatically to save space. Your files and folders are never touched.</p>
+      <label class="toggle setting"><input type="checkbox" id="hideNoStaff"> Hide BEO events with no bar staff on the TL sheet</label>
+      <p class="muted small">Keeps Today and the calendar to events your bar team is working. You can also hide any single event with its <b>Hide</b> button in the Today view.</p>
       <label class="field">Keep bar consumption data for
         <select id="consKeep">
           <option value="fy2">This and last financial year</option>
@@ -258,18 +262,18 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-08b"></script>
-  <script src="config.js?v=2026-11-08b"></script>
-  <script src="js/slimzip.js?v=2026-11-08b"></script>
-  <script src="js/parse.js?v=2026-11-08b"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-08b"></script>
-  <script src="js/tl.js?v=2026-11-08b"></script>
-  <script src="js/beo.js?v=2026-11-08b"></script>
-  <script src="js/folder.js?v=2026-11-08b"></script>
-  <script src="js/match.js?v=2026-11-08b"></script>
-  <script src="js/consumption.js?v=2026-11-08b"></script>
-  <script src="js/consui.js?v=2026-11-08b"></script>
-  <script src="js/drive.js?v=2026-11-08b"></script>
-  <script src="js/app.js?v=2026-11-08b"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-12a"></script>
+  <script src="config.js?v=2026-11-12a"></script>
+  <script src="js/slimzip.js?v=2026-11-12a"></script>
+  <script src="js/parse.js?v=2026-11-12a"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-12a"></script>
+  <script src="js/tl.js?v=2026-11-12a"></script>
+  <script src="js/beo.js?v=2026-11-12a"></script>
+  <script src="js/folder.js?v=2026-11-12a"></script>
+  <script src="js/match.js?v=2026-11-12a"></script>
+  <script src="js/consumption.js?v=2026-11-12a"></script>
+  <script src="js/consui.js?v=2026-11-12a"></script>
+  <script src="js/drive.js?v=2026-11-12a"></script>
+  <script src="js/app.js?v=2026-11-12a"></script>
 </body>
 </html>
