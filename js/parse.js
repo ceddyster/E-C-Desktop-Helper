@@ -295,6 +295,14 @@
         throw new Error(`looks like a TL Sheet but has no bar tabs. Tabs: ${names.slice(0, 15).join(', ')}${names.length > 15 ? '…' : ''}`);
       }
     }
+    if (!isText && global.CrownMgr) {
+      // Manager allocation workbooks: "… Manager Allocation" title above a Monday–Sunday row.
+      if (global.CrownMgr.looksLike(global.XLSX.read(buf, { type: 'array', sheetRows: 6 }))) {
+        const data = global.CrownMgr.read(global.XLSX.read(buf, { type: 'array', cellDates: true }), name);
+        return [{ label: `Manager allocation · ${data.people.length} managers`, kind: 'ready', isMgr: true, mgr: data,
+          ready: { events: [], shifts: [], warnings: data.warnings || [] } }];
+      }
+    }
     if (!isText && global.CrownCons) {
       // Banquet consumption workbooks: recognised from row 1 ("Banquet Consumption Report").
       const peek = global.XLSX.read(buf, { type: 'array', sheetRows: 1 });

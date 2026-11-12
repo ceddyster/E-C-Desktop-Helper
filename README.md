@@ -8,7 +8,8 @@ The main page is a one-page summary made of small windows. Click a window to ope
 - **Hiding events that aren't yours:** each event in the full Today view has a **Hide** button, and hidden events stay off the Today window and calendar too. "N events hidden · Show" at the bottom of a day brings them back, where each can be unhidden. ⚙︎ Settings → **Hide BEO events with no bar staff on the TL sheet** does this automatically.
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
 - **Bar consumption**: this week's units used, beverage total (the MICROS amount, inc GST), cost and cost %, plus the most-used products. Click it for the totals panel (see below).
-- **3 empty add-on slots** for future features.
+- **Managers on today**: every manager working today from the Manager Allocation workbook, earliest start first, with their role, start time and the events under their name. Anyone on RDO or AL is listed on one "Off" line. Click it for the **week breakdown** (see below).
+- **2 empty add-on slots** for future features.
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.
 
@@ -91,6 +92,17 @@ The cut-off moves forward each 1 July and follows the *Keep bar consumption data
 
 Consumption data is kept in the browser's IndexedDB, separately from events. By default it keeps **this and last financial year** (1 July – 30 June). For example, on 6 Nov 2026 it keeps everything from 1 Jul 2025; on 1 Jul 2027 FY 2025–26 drops off. Other options are in ⚙︎ Settings: three financial years, 12 months, 2 years or forever. The totals panel has **This / Last financial year** periods and a **Financial year** grouping. The dashboard asks the browser to keep this data even when disk space runs low. Because the workbooks stay in their folder, **Re-read all** can always rebuild the totals.
 
+### Manager Allocation workbooks → Managers on today
+
+Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.xlsx* workbooks the same way as the others (📁 → **Link another folder**), or load one with 📂. They're recognised by their "… Manager Allocation" title above a Monday–Sunday row, wherever they sit in the folder.
+
+- **Each manager:** the name in column A, with a start time (`900`, `1630`, `900 - 1700`) or **RDO / AL** under each day. The line below the name is their **role** (BSM, Asst Ops Mgr…). The lines below that, up to the next manager, are the **events and duties** for each day (PWC, Setup, Duty Manager…).
+- **Section headings** (SERVICE, HIGH DUTIES, ADMINISTRATION) group the week view.
+- **A line with times or duties but no name** is shown as *Name not filled in*. Template lines with no name and nobody working are left out.
+- **Dates:** from the date row under Monday–Sunday, or from the file name if that's missing.
+- **The week view** shows Mon–Sun with today highlighted, ‹ / › to move between loaded weeks and **This week** to come back. **Only managers working this week** hides anyone who is off all week. Your name (⚙︎ Settings → My name) is highlighted.
+- **One allocation per week:** a re-saved or renamed copy of the same week replaces it. Weeks are cleared with the rest of the old data (⚙︎ Settings → keep months).
+
 ### TL Sheet → bar team roster
 
 Download the week's TL workbook (Excel for the web: *File → Create a Copy → Download a Copy*) and load it with **Load documents**. It's recognised automatically (`js/tl.js`):
@@ -165,6 +177,8 @@ js/beo.js         BEO PDF reader (→ events)
 js/match.js       TL duty ↔ BEO name matching
 js/consumption.js reads bar consumption workbooks
 js/consui.js      bar consumption window + totals panel
+js/mgr.js         reads Manager Allocation workbooks
+js/mgrui.js       Managers on today window + week panel
 js/slimzip.js     makes big .xlsx/.xlsm files quick to read
 js/folder.js      linked-folder access (File System Access API)
 js/drive.js       optional Google Drive picker

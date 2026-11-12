@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-12c">
+  <link rel="stylesheet" href="styles.css?v=2026-11-12d">
 </head>
 <body>
   <header class="topbar">
@@ -64,7 +64,17 @@
       </div>
       <div id="consWinBody"></div>
     </section>
-    <section class="card placeholder"><span>Add-on slot 2</span></section>
+    <!-- MANAGERS (compact: who is on today) -->
+    <section class="card win" id="mgrWin" tabindex="0" role="button" aria-label="Open the week's manager allocation">
+      <div class="win-head">
+        <div>
+          <h2>Managers on today</h2>
+          <p class="muted small" id="mgrWinSub"></p>
+        </div>
+        <span class="win-open" aria-hidden="true">Week ›</span>
+      </div>
+      <ul class="win-list" id="mgrWinList"></ul>
+    </section>
     <section class="card placeholder"><span>Add-on slot 3</span></section>
     <section class="card placeholder"><span>Add-on slot 4</span></section>
   </main>
@@ -167,6 +177,26 @@
     </div>
   </dialog>
 
+  <!-- MANAGERS: week breakdown -->
+  <dialog id="mgrDlg" class="dlg panel" aria-labelledby="mgrTitle">
+    <div class="dlg-inner">
+      <div class="card-head">
+        <div>
+          <h2 id="mgrTitle">Manager allocation</h2>
+          <p class="muted small" id="mgrRange"></p>
+        </div>
+        <div class="seg">
+          <button class="btn sm" type="button" id="mgrPrev" aria-label="Previous week">‹</button>
+          <button class="btn sm" type="button" id="mgrThisWeek">This week</button>
+          <button class="btn sm" type="button" id="mgrNext" aria-label="Next week">›</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
+        </div>
+      </div>
+      <label class="small mgr-only"><input type="checkbox" id="mgrOnlyOn" checked> Only managers working this week</label>
+      <div class="mgr-grid" id="mgrGrid"></div>
+    </div>
+  </dialog>
+
   <!-- IMPORT REVIEW -->
   <dialog id="importDlg" class="dlg wide">
     <form method="dialog" class="dlg-inner">
@@ -262,18 +292,20 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-12c"></script>
-  <script src="config.js?v=2026-11-12c"></script>
-  <script src="js/slimzip.js?v=2026-11-12c"></script>
-  <script src="js/parse.js?v=2026-11-12c"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-12c"></script>
-  <script src="js/tl.js?v=2026-11-12c"></script>
-  <script src="js/beo.js?v=2026-11-12c"></script>
-  <script src="js/folder.js?v=2026-11-12c"></script>
-  <script src="js/match.js?v=2026-11-12c"></script>
-  <script src="js/consumption.js?v=2026-11-12c"></script>
-  <script src="js/consui.js?v=2026-11-12c"></script>
-  <script src="js/drive.js?v=2026-11-12c"></script>
-  <script src="js/app.js?v=2026-11-12c"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-12d"></script>
+  <script src="config.js?v=2026-11-12d"></script>
+  <script src="js/slimzip.js?v=2026-11-12d"></script>
+  <script src="js/parse.js?v=2026-11-12d"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-12d"></script>
+  <script src="js/tl.js?v=2026-11-12d"></script>
+  <script src="js/beo.js?v=2026-11-12d"></script>
+  <script src="js/folder.js?v=2026-11-12d"></script>
+  <script src="js/match.js?v=2026-11-12d"></script>
+  <script src="js/consumption.js?v=2026-11-12d"></script>
+  <script src="js/consui.js?v=2026-11-12d"></script>
+  <script src="js/mgr.js?v=2026-11-12d"></script>
+  <script src="js/mgrui.js?v=2026-11-12d"></script>
+  <script src="js/drive.js?v=2026-11-12d"></script>
+  <script src="js/app.js?v=2026-11-12d"></script>
 </body>
 </html>
