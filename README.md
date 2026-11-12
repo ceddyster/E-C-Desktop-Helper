@@ -9,6 +9,7 @@ The main page is a one-page summary made of small windows. Click a window to ope
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
 - **Bar consumption**: this week's units used, beverage total (the MICROS amount, inc GST), cost and cost %, plus the most-used products. Click it for the totals panel (see below).
 - **Managers on today**: every manager working today from the Manager Allocation workbook, earliest start first, with their role, start time and the events under their name. Anyone on RDO or AL is listed on one "Off" line. Click it for the **week breakdown** (see below).
+- **Closing a popup:** click ✕, press Esc, or click anywhere outside it on the dimmed dashboard. Import and ⚙︎ Settings only close with their buttons, so choices aren't lost.
 - **2 empty add-on slots** for future features.
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.

@@ -1033,6 +1033,17 @@
     opener('todayWin', () => openDay(todayISO()));
     opener('calWin', openCal);
     document.querySelectorAll('[data-close]').forEach((b) => b.onclick = () => b.closest('dialog').close());
+    // Clicking outside a popup (on the dimmed dashboard) closes it, like ✕. Only when the press both
+    // starts and ends outside, so selecting text inside and letting go outside doesn't close it.
+    // Not for Import (you'd lose your choices) or Settings (unsaved changes).
+    for (const id of ['dayDlg', 'calDlg', 'consDlg', 'mgrDlg', 'sourcesDlg']) {
+      const dlg = $(id); if (!dlg) continue;
+      let downOutside = false;
+      const outside = (e) => { if (e.target !== dlg) return false; const r = dlg.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+      dlg.addEventListener('pointerdown', (e) => { downOutside = outside(e); });
+      dlg.addEventListener('click', (e) => { if (downOutside && outside(e)) dlg.close(); downOutside = false; });
+    }
     // Clicking outside a panel closes it.
     ['dayDlg', 'calDlg'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target === $(id)) $(id).close(); }));
     document.querySelectorAll('[data-calmode]').forEach((b) => b.onclick = () => {
