@@ -1044,8 +1044,6 @@
       dlg.addEventListener('pointerdown', (e) => { downOutside = outside(e); });
       dlg.addEventListener('click', (e) => { if (downOutside && outside(e)) dlg.close(); downOutside = false; });
     }
-    // Clicking outside a panel closes it.
-    ['dayDlg', 'calDlg'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target === $(id)) $(id).close(); }));
     document.querySelectorAll('[data-calmode]').forEach((b) => b.onclick = () => {
       view.calMode = b.dataset.calmode;
       try { localStorage.setItem(STORE + '.calMode', view.calMode); } catch (_) {}

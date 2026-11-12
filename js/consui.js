@@ -287,7 +287,7 @@
       if (e.target.matches('[data-ok-note]') && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); editingOk = null; renderPanel(); }
     });
     $('consDlg').addEventListener('click', (e) => {
-      if (e.target === $('consDlg')) return $('consDlg').close();
+      if (e.target === $('consDlg')) return;   // outside clicks: handled with the other popups in app.js
       const th = e.target.closest('[data-sort]');
       if (th) { const c = th.dataset.sort; const cur = ui.sort || lastTable.sort; ui.sort = { col: c, dir: cur.col === c ? -cur.dir : (c === 'k' ? 1 : -1) }; return renderPanel(); }
       const tr = e.target.closest('[data-drill]');
