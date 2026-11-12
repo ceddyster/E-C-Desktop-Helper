@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-12l">
+  <link rel="stylesheet" href="styles.css?v=2026-11-12m">
 </head>
 <body>
   <header class="topbar">
@@ -75,7 +75,17 @@
       </div>
       <ul class="win-list" id="mgrWinList"></ul>
     </section>
-    <section class="card placeholder"><span>Add-on slot 3</span></section>
+    <!-- ON-CONSUMPTION SHEETS (compact: today's and tomorrow's events) -->
+    <section class="card win" id="ocWin" tabindex="0" role="button" aria-label="Make an on-consumption sheet">
+      <div class="win-head">
+        <div>
+          <h2>On-consumption sheets</h2>
+          <p class="muted small" id="ocWinSub"></p>
+        </div>
+        <span class="win-open" aria-hidden="true">Make a sheet ›</span>
+      </div>
+      <ul class="win-list" id="ocWinList"></ul>
+    </section>
     <section class="card placeholder"><span>Add-on slot 4</span></section>
   </main>
 
@@ -206,6 +216,53 @@
     </div>
   </dialog>
 
+  <!-- ON-CONSUMPTION SHEET BUILDER -->
+  <dialog id="ocDlg" class="dlg panel" aria-labelledby="ocTitle">
+    <div class="dlg-inner">
+      <div class="card-head">
+        <div>
+          <h2 id="ocTitle">On-consumption sheet</h2>
+          <p class="muted small" id="ocStatus"></p>
+        </div>
+        <div class="seg">
+          <button class="btn primary sm" type="button" id="ocPrintBtn">🖨 Print</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="oc-wrap">
+        <div class="oc-edit">
+          <label class="oc-f">Event <select id="ocEvent"></select></label>
+          <div class="oc-grid">
+            <label class="oc-f">Event name <input type="text" id="ocName"></label>
+            <label class="oc-f">Event date <input type="date" id="ocDate"></label>
+            <label class="oc-f">Bar location <input type="text" id="ocBars" placeholder="e.g. CB1&amp;2"></label>
+            <div class="oc-f">On consumption
+              <span class="oc-time"><input type="time" id="ocFrom" aria-label="From"> – <input type="time" id="ocTo" aria-label="Until (optional)"></span>
+            </div>
+          </div>
+          <div class="oc-opts">
+            <label class="small"><input type="checkbox" id="ocPerBar"> A separate sheet for each bar (list bars with commas)</label>
+            <label class="small">Blank lines for extras <input type="number" id="ocBlanks" min="0" max="20" value="3"></label>
+          </div>
+          <h3 class="label">Items</h3>
+          <ul class="oc-items-edit" id="ocItems"></ul>
+          <div class="oc-add">
+            <input type="text" id="ocAddName" list="ocMenuList" placeholder="Add an item: type to search the menu" aria-label="Item to add">
+            <select id="ocAddCat" aria-label="Section"></select>
+            <button class="btn sm" type="button" id="ocAdd">Add</button>
+          </div>
+          <datalist id="ocMenuList"></datalist>
+          <p class="muted small" id="ocMenuNote"></p>
+          <button class="linkbtn small" type="button" id="ocReset">Start again from the BEO</button>
+        </div>
+        <div class="oc-preview-wrap">
+          <h3 class="label">Preview</h3>
+          <div class="oc-preview" id="ocPreview"></div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
   <!-- IMPORT REVIEW -->
   <dialog id="importDlg" class="dlg wide">
     <form method="dialog" class="dlg-inner">
@@ -301,20 +358,22 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-12l"></script>
-  <script src="config.js?v=2026-11-12l"></script>
-  <script src="js/slimzip.js?v=2026-11-12l"></script>
-  <script src="js/parse.js?v=2026-11-12l"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-12l"></script>
-  <script src="js/tl.js?v=2026-11-12l"></script>
-  <script src="js/beo.js?v=2026-11-12l"></script>
-  <script src="js/folder.js?v=2026-11-12l"></script>
-  <script src="js/match.js?v=2026-11-12l"></script>
-  <script src="js/consumption.js?v=2026-11-12l"></script>
-  <script src="js/consui.js?v=2026-11-12l"></script>
-  <script src="js/mgr.js?v=2026-11-12l"></script>
-  <script src="js/mgrui.js?v=2026-11-12l"></script>
-  <script src="js/drive.js?v=2026-11-12l"></script>
-  <script src="js/app.js?v=2026-11-12l"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-12m"></script>
+  <script src="config.js?v=2026-11-12m"></script>
+  <script src="js/slimzip.js?v=2026-11-12m"></script>
+  <script src="js/parse.js?v=2026-11-12m"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-12m"></script>
+  <script src="js/tl.js?v=2026-11-12m"></script>
+  <script src="js/beo.js?v=2026-11-12m"></script>
+  <script src="js/menu.js?v=2026-11-12m"></script>
+  <script src="js/folder.js?v=2026-11-12m"></script>
+  <script src="js/match.js?v=2026-11-12m"></script>
+  <script src="js/consumption.js?v=2026-11-12m"></script>
+  <script src="js/consui.js?v=2026-11-12m"></script>
+  <script src="js/mgr.js?v=2026-11-12m"></script>
+  <script src="js/mgrui.js?v=2026-11-12m"></script>
+  <script src="js/onconui.js?v=2026-11-12m"></script>
+  <script src="js/drive.js?v=2026-11-12m"></script>
+  <script src="js/app.js?v=2026-11-12m"></script>
 </body>
 </html>

@@ -47,7 +47,7 @@
       const height = page.getViewport({ scale: 1 }).height;
       const tc = await page.getTextContent();
       const items = tc.items.filter((it) => it.str && it.str.trim())
-        .map((it) => ({ page: p, x: it.transform[4], y: it.transform[5], str: it.str.trim() }));
+        .map((it) => ({ page: p, x: it.transform[4], y: it.transform[5], w: it.width || 0, size: Math.abs(it.transform[3]) || 0, str: it.str.trim() }));
       pages.push({ items, height, width: page.getViewport({ scale: 1 }).width });
     }
     return pages;
@@ -206,5 +206,5 @@
       ready: { events, shifts: [], warnings } }];
   }
 
-  global.CrownBEO = { readBEO };
+  global.CrownBEO = { readBEO, readItems, toLines, lineText };
 })(window);

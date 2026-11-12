@@ -433,3 +433,54 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .mgr-hidden ul { list-style: none; padding: 6px 0 0; margin: 0; }
 .mgr-hidden li { padding: 4px 0; display: flex; gap: 10px; align-items: baseline; }
 @media (max-width: 600px) { .mgr-day li { grid-template-columns: 90px 1fr auto; } }
+
+/* On-consumption sheets */
+.oc-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 900px) { .oc-wrap { grid-template-columns: 1fr; } }
+.oc-f { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
+.oc-f input, .oc-f select { font-size: .95rem; color: var(--text); }
+.oc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 600px) { .oc-grid { grid-template-columns: 1fr; } }
+.oc-time { display: flex; gap: 6px; align-items: center; color: var(--text); }
+.oc-time input { flex: 1; min-width: 0; }
+.oc-opts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 12px; }
+.oc-opts label { display: inline-flex; gap: 6px; align-items: center; }
+.oc-opts input[type=number] { width: 56px; }
+.oc-items-edit { list-style: none; padding: 0; margin: 6px 0 10px; }
+.oc-items-edit .oc-cat { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 10px 0 4px; }
+.oc-row { display: grid; grid-template-columns: 1fr 150px auto; gap: 6px; align-items: center; padding: 3px 0; }
+.oc-row input, .oc-row select { min-width: 0; }
+.oc-add { display: grid; grid-template-columns: 1fr 150px auto; gap: 6px; margin-bottom: 8px; }
+@media (max-width: 600px) { .oc-row, .oc-add { grid-template-columns: 1fr auto; } .oc-row select, .oc-add select { grid-column: 1; grid-row: 2; } }
+.oc-preview { border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #000; padding: 18px; }
+.oc-preview .oc-sheet + .oc-sheet { border-top: 2px dashed #bbb; margin-top: 18px; padding-top: 18px; }
+.oc-li { cursor: pointer; }
+.oc-printed { color: var(--mine); font-weight: 600; }
+/* The sheet itself (preview and print) */
+.oc-sheet { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 12pt; }
+.oc-sheet table { border-collapse: collapse; width: 100%; }
+.oc-sheet th, .oc-sheet td { border: 1px solid #000; padding: 5px 8px; text-align: left; vertical-align: middle; }
+.oc-head { margin-bottom: 12px; }
+.oc-head th { width: 32%; background: #eee; }
+.oc-items thead th { background: #eee; }
+.oc-items .c { width: 32%; }
+.oc-items td { height: 1.75em; }
+.oc-items .oc-grp td { background: #f6f6f6; font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; height: auto; padding: 3px 8px; }
+.oc-foot { margin-top: 14px; }
+.oc-foot th { width: 18%; background: #eee; white-space: nowrap; }
+.oc-foot td { height: 2em; }
+#ocPrint { display: none; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body.printing-oc > *:not(#ocPrint) { display: none !important; }
+  body.printing-oc { background: #fff !important; margin: 0 !important; padding: 0 !important; display: block !important; max-width: none !important; width: auto !important; }
+  body.printing-oc #ocPrint { width: 100%; }
+  #ocPrint .oc-sheet { font-size: 11pt; }
+  #ocPrint .oc-items td { height: 1.55em; padding: 3px 8px; }
+  #ocPrint .oc-sheet.compact .oc-items td { height: 1.3em; padding: 2px 8px; font-size: 10pt; }
+  #ocPrint .oc-foot { break-inside: avoid; }
+  body.printing-oc #ocPrint { display: block; }
+  #ocPrint .oc-sheet { break-after: page; }
+  #ocPrint .oc-sheet:last-child { break-after: auto; }
+  #ocPrint .oc-items tr { break-inside: avoid; }
+}

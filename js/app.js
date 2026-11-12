@@ -244,7 +244,8 @@
     $('onlyMine').checked = view.onlyMine;
     // Each part draws on its own, so a problem in one can't blank the whole page.
     const renderMgr = () => window.CrownMgrUI && window.CrownMgrUI.render();
-    for (const part of [renderTodayWin, renderCalWin, renderDaily, renderCalendar, renderUpcoming, renderMgr]) {
+    const renderOncon = () => window.CrownOnconUI && window.CrownOnconUI.render();
+    for (const part of [renderTodayWin, renderCalWin, renderDaily, renderCalendar, renderUpcoming, renderMgr, renderOncon]) {
       try { part(); } catch (e) { console.error(e); if (window.__crownShowError) window.__crownShowError(`${e.message} (${part.name})`); }
     }
   }
@@ -477,6 +478,11 @@
       return { fileName: name, sheets, sourceId: `src:cons:${day}|${base}`, auto: true, cons: first.cons,
         displayName: `Bar consumption · ${first.cons.date ? fmtShort(first.cons.date) : name}` };
     }
+    if (first.isMenu) {
+      // One entry per menu file: a re-saved copy replaces it.
+      const base = name.replace(/\.[a-z0-9]+$/i, '').replace(/\s*(\(\d+\)|-\s*copy(\s*\(\d+\))?)\s*$/i, '').trim();
+      return { fileName: name, sheets, sourceId: 'src:menu:' + base.toLowerCase(), auto: true, menu: first.menu, displayName: `Banquet menu · ${base}` };
+    }
     if (first.isMgr) {
       // One allocation per week: a re-saved or renamed copy of the same week replaces it.
       const wk = first.mgr.weekStart;
@@ -524,6 +530,12 @@
     const name = file.fileName + (sh.label ? ` › ${sh.label}` : '');
     if (sh.kind === 'ready') {
       const r = sh.ready;
+      if (sh.isMenu) {
+        const m = sh.menu, cats = [...new Set(m.items.map((i) => i.cat))];
+        div.innerHTML = `<div class="imp-head"><strong>${esc(name)}</strong><span class="muted small">${m.items.length} beverage items</span></div>
+          <div class="preview"><table><tr><th>Section</th><th>Items</th></tr>${cats.map((c) => `<tr><td>${esc(c)}</td><td>${esc(m.items.filter((i) => i.cat === c).map((i) => i.name).join(', '))}</td></tr>`).join('')}</table></div>`;
+        return;
+      }
       if (sh.isMgr) {
         const m = sh.mgr, t = (d) => (d.off || (d.start ? d.start + (d.end ? '–' + d.end : '') : d.text || (d.events.length ? '—' : '')));
         div.innerHTML = `<div class="imp-head"><strong>${esc(name)}</strong><span class="muted small">${fmtShort(m.dates[0])} – ${fmtShort(m.dates[6])}</span></div>
@@ -590,7 +602,7 @@
   /** Stores entries (replacing earlier data from the same source). Returns their dates, sorted. */
   function commitEntries(entries, quiet) {
     let ne = 0, ns = 0;
-    const dates = [], consDays = [], mgrWeeks = [];
+    const dates = [], consDays = [], mgrWeeks = [], menuFiles = [];
     for (const file of entries) {
       const id = file.sourceId || 'src:' + file.fileName.toLowerCase();
       // Two copies of the same BEO: keep the one printed most recently (its "Created" time), whatever
@@ -616,6 +628,11 @@
         window.CrownConsUI.add(id, file.cons);
         consDays.push(file.cons.date ? fmtShort(file.cons.date) : file.fileName);
       }
+      if (file.menu) {
+        Object.assign(src, { menu: true, items: file.menu.items.length });
+        window.CrownOnconUI.addMenu(id, Object.assign({}, file.menu, { file: file.fileName, savedAt: file.fileSaved || Date.now() }));
+        menuFiles.push(file.menu.title);
+      }
       if (file.mgr) {
         Object.assign(src, { mgr: true, mgrWeekEnd: file.mgr.dates[6], people: file.mgr.people.length });
         window.CrownMgrUI.add(id, Object.assign({}, file.mgr, { file: file.fileName, savedAt: file.fileSaved || Date.now() }));
@@ -627,7 +644,8 @@
     }
     pruneCons();
     const cleared = pruneOld();
-    if (!quiet && mgrWeeks.length && !consDays.length && !ne && !ns) toast(`Imported the manager allocation for the week of ${mgrWeeks.join(', ')}.`);
+    if (!quiet && menuFiles.length && !mgrWeeks.length && !consDays.length && !ne && !ns) toast(`Read the beverage items from ${menuFiles.join(', ')}.`);
+    else if (!quiet && mgrWeeks.length && !consDays.length && !ne && !ns) toast(`Imported the manager allocation for the week of ${mgrWeeks.join(', ')}.`);
     else if (!quiet && consDays.length && !ne && !ns) toast(`Imported bar consumption for ${consDays.join(', ')}.${mgrWeeks.length ? ` Manager allocation: week of ${mgrWeeks.join(', ')}.` : ''}`);
     else if (!quiet) toast(`Imported ${ne} events and ${ns} shifts.${consDays.length ? ` Bar consumption: ${consDays.join(', ')}.` : ''}${cleared ? ` ${cleared} older than ${state.keepMonths} month${+state.keepMonths === 1 ? '' : 's'} not kept.` : ''}`);
     return dates.sort();
@@ -643,11 +661,11 @@
   const READER_VERSION = 15;
   // One version per kind of file. Bump just the kind whose reader changed, so only those files are
   // read again ("other" = files that weren't recognised, re-checked when a new kind is added).
-  const READERS = { tl: 1, beo: 1, cons: 1, mgr: 1, other: 1 };
-  const kindOf = (entry) => (entry.mgr ? 'mgr' : entry.cons ? 'cons' : entry.sheets[0].isTL ? 'tl' : entry.sheets[0].isBEO || entry.beoNumber ? 'beo' : 'other');
+  const READERS = { tl: 1, beo: 1, cons: 1, mgr: 1, menu: 1, other: 2 };
+  const kindOf = (entry) => (entry.menu ? 'menu' : entry.mgr ? 'mgr' : entry.cons ? 'cons' : entry.sheets[0].isTL ? 'tl' : entry.sheets[0].isBEO || entry.beoNumber ? 'beo' : 'other');
   // Files read before kinds were recorded: worked out from what Documents says about them.
   const kindFromInfo = (v) => { const d = (v && v.detail) || '';
-    return /^manager allocation/.test(d) ? 'mgr' : /^bar consumption/.test(d) ? 'cons' : /bar shifts$/.test(d) ? 'tl'
+    return /^banquet menu/.test(d) ? 'menu' : /^manager allocation/.test(d) ? 'mgr' : /^bar consumption/.test(d) ? 'cons' : /bar shifts$/.test(d) ? 'tl'
       : (v && v.status === 'older') || /BEO|\bevents?\b/.test(d) ? 'beo' : 'other'; };
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
@@ -754,12 +772,14 @@
         if (st.seen[x.path] === x.lastModified) continue;
         // Last saved before the kept period starts, so it can't hold this or last financial year's data.
         // (If someone edits it later, its saved time changes and it's looked at again.)
-        if (keepFromMs && x.lastModified < keepFromMs) {
+        // Banquet Menus are valid for a year or more, so they're read however old they are.
+        const isMenu = window.CrownMenu && window.CrownMenu.nameSaysMenu(x.name);
+        if (keepFromMs && x.lastModified < keepFromMs && !isMenu) {
           st.files[x.path] = { status: 'old', saved: x.lastModified, detail: `last saved before ${fmtShort(keepFrom)}, outside the period kept` };
           continue;
         }
         // Spreadsheets (TL Sheets) are always read. PDFs untouched for 60+ days are left out to keep things quick.
-        if (/\.(pdf|ics)$/i.test(x.name) && st.seen[x.path] == null && x.lastModified < cutoff) {
+        if (/\.(pdf|ics)$/i.test(x.name) && st.seen[x.path] == null && x.lastModified < cutoff && !isMenu) {
           st.files[x.path] = { status: 'old', detail: `not changed in ${FIRST_SCAN_DAYS}+ days` };
           continue;
         }
@@ -791,15 +811,15 @@
             Object.assign(entry, { fromFolder: true, fileSaved: x.lastModified, path: x.path, wasSeen: st.seen[x.path] != null });
             const r = entry.sheets[0].ready || { events: [], shifts: [] };
             st.files[x.path] = { status: 'loaded', saved: x.lastModified,
-              detail: entry.mgr ? `manager allocation · week of ${fmtShort(entry.mgr.weekStart)} · ${entry.mgr.people.length} managers` : entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units${(entry.cons.warnings || []).length ? ' · ⚠ ' + entry.cons.warnings.join(' ') : ''}` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
+              detail: entry.menu ? `banquet menu · ${entry.menu.items.length} beverage items` : entry.mgr ? `manager allocation · week of ${fmtShort(entry.mgr.weekStart)} · ${entry.mgr.people.length} managers` : entry.cons ? `bar consumption · ${entry.cons.events.length} events · ${Math.round(entry.cons.rows.reduce((a, x) => a + x.used, 0))} units${(entry.cons.warnings || []).length ? ' · ⚠ ' + entry.cons.warnings.join(' ') : ''}` : entry.sheets[0].isTL ? `${r.shifts.length} bar shifts` : `${r.events.length} event${r.events.length === 1 ? '' : 's'}${entry.beoCreated ? ` · BEO created ${fmtCreated(entry.beoCreated)}` : ''}` };
             batch.push(entry);
           } else {
-            st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO, consumption or manager allocation workbook' };
+            st.files[x.path] = { status: 'skipped', detail: 'not a TL Sheet, BEO, Banquet Menu, consumption or manager allocation workbook' };
           }
           st.seen[x.path] = x.lastModified;
           st.kind[x.path] = entry.auto ? kindOf(entry) : 'other';
         } catch (e) {
-          if (/doesn't look like a BEO|looks like a TL Sheet but has no bar tabs|shortcut/i.test(e.message)) {
+          if (/doesn't look like a BEO|looks like a TL Sheet but has no bar tabs|looks like a menu but no beverage|shortcut/i.test(e.message)) {
             // Readable, just not one of ours (contracts, banquet checks…): note it and don't re-read it at every check.
             st.files[x.path] = { status: 'skipped', detail: e.message.replace(/^This PDF doesn't look like a BEO.*$/, 'PDF that isn\'t a BEO') };
             st.seen[x.path] = x.lastModified;
@@ -843,7 +863,7 @@
     const panel = $('folderPanel');
     if (!panel) return;
     if (!F || !F.supported) { panel.innerHTML = '<p class="muted small">Linking a folder needs Microsoft Edge or Google Chrome.</p>'; return; }
-    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet, BEO, consumption or manager allocation workbook', old: 'Older files not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
+    const LABEL = { loaded: 'Loaded', older: 'Older BEO copies (ignored)', error: 'Couldn\'t read', skipped: 'Not a TL Sheet, BEO, Banquet Menu, consumption or manager allocation workbook', old: 'Older files not checked', shortcut: 'Shortcuts (.url): can\'t be read' };
     const boxes = folders.map((f) => {
       const st = fstate(f.id);
       const files = Object.entries(st.files || {}).sort((a, b) => a[0].localeCompare(b[0]));
@@ -908,6 +928,7 @@
   function removeSource(id, silent) {
     if (id.startsWith('src:cons:') && window.CrownConsUI) window.CrownConsUI.remove(id);
     if (id.startsWith('src:mgr:') && window.CrownMgrUI) window.CrownMgrUI.remove(id);
+    if (id.startsWith('src:menu:') && window.CrownOnconUI) window.CrownOnconUI.removeMenu(id);
     state.sources = state.sources.filter((s) => s.id !== id);
     state.events = state.events.filter((e) => e.source !== id);
     state.shifts = state.shifts.filter((s) => s.source !== id);
@@ -920,7 +941,7 @@
     renderFolder();
     $('sourceCountAll').textContent = state.sources.length;
     $('sourceList').innerHTML = state.sources.length ? state.sources.map((s) => `<li>
-      <div><div>${esc(s.name)}</div><div class="meta">${s.mgr ? `${s.people} managers` : s.cons ? `${s.events} events · ${(s.units || 0).toLocaleString('en-AU')} units used` : `${s.events} events · ${s.shifts} shifts`}${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
+      <div><div>${esc(s.name)}</div><div class="meta">${s.menu ? `${s.items} beverage items` : s.mgr ? `${s.people} managers` : s.cons ? `${s.events} events · ${(s.units || 0).toLocaleString('en-AU')} units used` : `${s.events} events · ${s.shifts} shifts`}${s.beoCreated ? ` · BEO created ${esc(fmtCreated(s.beoCreated))}` : ''}${s.fileSaved ? ` · file saved ${esc(fmtSaved(s.fileSaved))}` : ''} · read ${new Date(s.loadedAt).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' })}${s.fromFolder ? ' · from linked folder' : ''}</div></div>
       <button class="btn sm danger" type="button" data-remove="${esc(s.id)}">Remove</button></li>`).join('')
       : '<li class="empty">No documents loaded.</li>';
   }
@@ -990,6 +1011,7 @@
       state.sources = []; state.events = []; state.shifts = [];
       if (window.CrownConsUI) window.CrownConsUI.clear();
       if (window.CrownMgrUI) window.CrownMgrUI.clear();
+      if (window.CrownOnconUI) window.CrownOnconUI.clearMenus();
       for (const st of Object.values(state.folders || {})) { st.seen = {}; st.files = {}; }   // next folder check reloads everything
       save(); render(); renderSources();
     };
@@ -1036,7 +1058,7 @@
     // Clicking outside a popup (on the dimmed dashboard) closes it, like ✕. Only when the press both
     // starts and ends outside, so selecting text inside and letting go outside doesn't close it.
     // Not for Import (you'd lose your choices) or Settings (unsaved changes).
-    for (const id of ['dayDlg', 'calDlg', 'consDlg', 'mgrDlg', 'sourcesDlg']) {
+    for (const id of ['dayDlg', 'calDlg', 'consDlg', 'mgrDlg', 'ocDlg', 'sourcesDlg']) {
       const dlg = $(id); if (!dlg) continue;
       let downOutside = false;
       const outside = (e) => { if (e.target !== dlg) return false; const r = dlg.getBoundingClientRect();
@@ -1105,7 +1127,11 @@
     window.CrownMgrUI.wire({ toast, myName: () => state.myName || '' });
     window.__mgrTidy = () => { const known = new Set(state.sources.map((x) => x.id)); for (const id of window.CrownMgrUI.ids()) if (!known.has(id)) window.CrownMgrUI.remove(id); };
   }
-  load(); if (window.__mgrTidy) window.__mgrTidy(); wire(); render(); initFolder();
+  // On-consumption sheets add-on: builds printable check-off sheets from BEOs and the Banquet Menu.
+  if (window.CrownOnconUI) window.CrownOnconUI.wire({ toast, events: (iso) => visibleEvents(iso), myName: () => state.myName || '' });
+  load(); if (window.__mgrTidy) window.__mgrTidy();
+  if (window.CrownOnconUI) { const known = new Set(state.sources.map((x) => x.id)); for (const id of window.CrownOnconUI.menuIds()) if (!known.has(id)) window.CrownOnconUI.removeMenu(id); }
+  wire(); render(); initFolder();
   // Ask the browser to keep this site's saved data even when the disk is low (financial-year records).
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
   // Bar consumption add-on: totals window + panel. Days without a matching document entry are tidied away.
