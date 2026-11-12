@@ -105,12 +105,17 @@
   }
 
 
+  // Beverage revenue as rung up in MICROS (inc GST), from the tab's revenue box. Older stored days don't
+  // have it yet: the box's Ex GST figure is MICROS ÷ 1.1, so it's worked back from that.
+  const bevMicros = (e) => (e.micros != null ? e.micros : (e.revenue || 0) * 1.1);
+
   function summarise(sel) {
     const s = { events: sel.events.length, pax: sel.events.reduce((a, e) => a + (e.pax || 0), 0),
       units: sel.rows.reduce((a, r) => a + r.used, 0), charge: sel.rows.reduce((a, r) => a + r.chg, 0), rowCost: sel.rows.reduce((a, r) => a + r.cost, 0),
-      revenue: sel.events.reduce((a, e) => a + (e.revenue || 0), 0), cost: sel.events.reduce((a, e) => a + (e.cost || 0), 0) };
-    s.costPct = s.revenue ? s.cost / s.revenue : null;
-    s.perHead = s.pax ? s.revenue / s.pax : null;
+      revenue: sel.events.reduce((a, e) => a + (e.revenue || 0), 0), cost: sel.events.reduce((a, e) => a + (e.cost || 0), 0),
+      micros: sel.events.reduce((a, e) => a + bevMicros(e), 0) };
+    s.costPct = s.revenue ? s.cost / s.revenue : null;   // cost % stays on ex GST, as in the workbook
+    s.perHead = s.pax ? s.micros / s.pax : null;
     return s;
   }
 
@@ -118,16 +123,16 @@
     const g = GROUPS[ui.group];
     const eventLevel = !g.row && !sel.rowFiltered;
     const map = new Map();
-    const get = (k) => map.get(k) || map.set(k, { k, units: 0, charge: 0, cost: 0, revenue: 0, pax: 0, ev: new Set() }).get(k);
+    const get = (k) => map.get(k) || map.set(k, { k, units: 0, charge: 0, cost: 0, revenue: 0, micros: 0, pax: 0, ev: new Set() }).get(k);
     for (const r of sel.rows) { const x = get(keyOf(ui.group, r)); x.units += r.used; x.charge += r.chg; if (!eventLevel) x.cost += r.cost; x.ev.add(r.e.key); }
-    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); const oi = openIssues(e), ci = checkedIssues(e);
+    if (eventLevel) for (const e of sel.events) { const x = get(g.key(e)); x.revenue += e.revenue || 0; x.micros += bevMicros(e); x.cost += e.cost || 0; x.pax += e.pax || 0; x.ev.add(e.key); const oi = openIssues(e), ci = checkedIssues(e);
       if (oi.length) { x.flag = (x.flag || 0) + 1; x.flagTypes = [...new Set([...(x.flagTypes || []), ...oi])]; }
       if (ci.length) x.okTypes = [...new Set([...(x.okTypes || []), ...ci])]; }
     const cols = eventLevel
-      ? [['units', 'Units used'], ['pax', 'Pax'], ['revenue', 'Bev revenue (ex GST)'], ['cost', 'Bev cost'], ['pct', 'Cost %'], ['events', 'Events']]
+      ? [['units', 'Units used'], ['pax', 'Pax'], ['micros', 'Bev total (MICROS)'], ['cost', 'Bev cost'], ['pct', 'Cost %'], ['events', 'Events']]
       : [['units', 'Units used'], ['charge', 'On-consumption value (inc GST)'], ['cost', 'Cost'], ['events', 'Events']];
     let list = [...map.values()].map((x) => Object.assign(x, { events: x.ev.size, pct: x.revenue ? x.cost / x.revenue : null }));
-    const sort = ui.sort || (ui.group === 'day' || ui.group === 'month' || ui.group === 'fy' ? { col: 'k', dir: 1 } : { col: eventLevel ? 'revenue' : 'units', dir: -1 });
+    const sort = ui.sort || (ui.group === 'day' || ui.group === 'month' || ui.group === 'fy' ? { col: 'k', dir: 1 } : { col: eventLevel ? 'micros' : 'units', dir: -1 });
     list.sort((a, b) => { const va = a[sort.col], vb = b[sort.col]; return (typeof va === 'string' ? va.localeCompare(vb) : (va || 0) - (vb || 0)) * sort.dir; });
     return { cols, list, eventLevel, sort };
   }
@@ -192,7 +197,7 @@
     const miss = evs.filter((e) => openIssues(e).length);
     body.innerHTML = `<div class="kpis">
         <div><span>Units used</span><b>${int(s.units)}</b></div>
-        <div><span>Bev revenue</span><b>${money(s.revenue)}</b></div>
+        <div><span>Bev total (MICROS)</span><b>${money(s.micros)}</b></div>
         <div><span>Bev cost</span><b>${money(s.cost)}</b></div>
         <div><span>Cost %</span><b>${pct(s.costPct)}</b></div>
       </div>
@@ -210,7 +215,7 @@
     $('consChips').innerHTML = ui.filters.map((f, i) => `<span class="fchip">${esc(GROUPS[f.g].label)}: <b>${esc(GROUPS[f.g].show ? GROUPS[f.g].show(f.v) : f.v)}</b><button type="button" data-unfilter="${i}" aria-label="Remove filter">×</button></span>`).join('')
       + (ui.filters.length > 1 ? '<button type="button" class="linkbtn" data-unfilter="all">Clear all</button>' : '');
     const byDate = (a, b) => a.date.localeCompare(b.date);
-    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(e.revenue)} revenue${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''} <span class="muted small">· from ${esc(e.file || 'workbook')}${e.tab ? ' › ' + esc(e.tab) : ''}${e.tabDate ? ` (its Date cell says ${esc(fmtDay(e.tabDate))})` : ''}</span>`;
+    const line = (e) => `<b>${esc(e.event)}</b> · ${esc(fmtDay(e.date))}${e.beo ? ` · BEO ${esc(e.beo)}` : ''} · ${int(e.units)} units, ${money(e.cost)} cost, ${money(bevMicros(e))} bev total (MICROS)${smOf(e) ? ` · Service manager: <b>${esc(smOf(e))}</b>` : ''} <span class="muted small">· from ${esc(e.file || 'workbook')}${e.tab ? ' › ' + esc(e.tab) : ''}${e.tabDate ? ` (its Date cell says ${esc(fmtDay(e.tabDate))})` : ''}</span>`;
     const okForm = (type, e) => editingOk === okKey(type, e)
       ? `<span class="ok-form"><input type="text" data-ok-note placeholder="${esc(CHECKS[type].note)}" maxlength="120">
          <button class="btn sm primary" type="button" data-ok-save="${esc(okKey(type, e))}">Save</button><button class="btn sm" type="button" data-ok-cancel>Cancel</button></span>`
@@ -231,7 +236,7 @@
     $('consAlerts').innerHTML = html;
     $('consCards').innerHTML = (sel.rowFiltered
       ? [['Units used', int(s.units)], ['On-consumption value', money(s.charge)], ['Cost', money(s.rowCost)], ['Events', int(s.events)]]
-      : [['Events', int(s.events)], ['Pax', int(s.pax)], ['Units used', int(s.units)], ['Bev revenue (ex GST)', money(s.revenue)], ['Bev cost', money(s.cost)], ['Cost %', pct(s.costPct)], ['Revenue per head', money(s.perHead)]])
+      : [['Events', int(s.events)], ['Pax', int(s.pax)], ['Units used', int(s.units)], ['Bev total (MICROS)', money(s.micros)], ['Bev cost', money(s.cost)], ['Cost % (ex GST)', pct(s.costPct)], ['Bev per head (MICROS)', money(s.perHead)]])
       .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
     const t = table(sel); lastTable = t;
     const g = GROUPS[ui.group];
@@ -244,7 +249,7 @@
       : '<p class="empty">Nothing in this period. Try a longer period, or remove a filter.</p>';
     $('consNote').textContent = t.list.length && !t.eventLevel
       ? 'Units, values and costs here come from each bar\'s sheet. The official event Bev cost (from each Total block) can differ slightly for à la carte items.'
-      : t.list.length ? 'Revenue, cost and cost % are each event\'s official figures from its Total block (the same numbers as the workbook\'s Summary tab).' : '';
+      : t.list.length ? 'Bev total is the MICROS (inc GST) beverage figure from each tab\'s revenue box. Cost and cost % are the official Total block figures; cost % is worked on ex GST revenue, as in the workbook.' : '';
   }
   let lastTable = null;
 

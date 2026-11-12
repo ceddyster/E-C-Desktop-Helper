@@ -102,6 +102,24 @@
     };
   }
 
+  /** Beverage revenue as entered from MICROS (inc GST): the "Beverage/Corkage" row of the revenue box
+   *  (Revenue | MICROS | Ex GST, normally G8:K14). null if the tab has no such box. */
+  function micros(c, lastCol) {
+    for (let r = 1; r <= 16; r++) for (let col = 1; col < lastCol; col++) {
+      if (c.str(r, col).toLowerCase().trim() !== 'micros') continue;
+      for (let rr = r + 1; rr <= r + 10; rr++) {
+        let label = '';
+        for (let k = col - 1; k >= 1 && !label; k--) label = c.str(rr, k).trim();
+        if (/^total/i.test(label)) break;
+        if (!/^bev/i.test(label)) continue;
+        const v = c.num(rr, col), ex = c.num(rr, col + 1);
+        return v != null ? v : ex != null ? ex * 1.1 : 0;
+      }
+      return null;
+    }
+    return null;
+  }
+
   /** Parses a consumption workbook → { date, events: [...], rows: [...] }. */
   function read(wb, fileName) {
     const events = [], rows = [], warnings = [];
@@ -152,7 +170,7 @@
       const t = totalCol ? totals(c, totalCol) : {};
       Object.assign(ev, {
         revenue: t.revenue || t.pkgRev || 0, onCons: t.onCons || 0, cost: t.cost != null ? t.cost : evRows.reduce((s, x) => s + x.cost, 0),
-        units: evRows.reduce((s, x) => s + x.used, 0),
+        units: evRows.reduce((s, x) => s + x.used, 0), micros: micros(c, blocks[0]),
       });
       if (!evRows.length && !ev.revenue && !d.event) continue;   // empty "Event 5" etc.
       ev.date = ev.date || wbDate;

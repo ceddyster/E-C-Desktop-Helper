@@ -7,7 +7,7 @@ The main page is a one-page summary made of small windows. Click a window to ope
 - **Today**: each event's name, the bar staff working it, and the time each person starts. Click it for the full day view: one row per event, with the event details (BEO, function times, beverage, after-event jobs) on the left and the people working it (plus any unfilled spots) on the right. Use ‹ / › to move between days.
 - **Hiding events that aren't yours:** each event in the full Today view has a **Hide** button, and hidden events stay off the Today window and calendar too. "N events hidden · Show" at the bottom of a day brings them back, where each can be unhidden. ⚙︎ Settings → **Hide BEO events with no bar staff on the TL sheet** does this automatically.
 - **Calendar**: just today and tomorrow. Click it for the **week view** (Mon–Sun, with ‹ / › to change week). It has a **Month** switch, and **Shifts / Events** and **Only mine** filters. Click a day in the calendar to open that day's full view.
-- **Bar consumption**: this week's units used, beverage revenue, cost and cost %, plus the most-used products. Click it for the totals panel (see below).
+- **Bar consumption**: this week's units used, beverage total (the MICROS amount, inc GST), cost and cost %, plus the most-used products. Click it for the totals panel (see below).
 - **3 empty add-on slots** for future features.
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.
@@ -64,6 +64,7 @@ Link the folder of daily consumption workbooks (e.g. `November/04.xlsm`) with **
 
 - **Each event tab:** the event details are read (BEO #, date, name, pax, room, event type, event / service manager, DM), plus every product used in each **bar block** (bar name, category, size, opening, transfer, closing, used, charge, cost).
 - **The Total block:** gives each event's official beverage revenue, cost and cost %. These are the same figures as the workbook's Summary tab.
+- **Beverage total (MICROS):** taken from the "Beverage/Corkage" line of each tab's revenue box (the MICROS column, inc GST), not the Ex GST column. Cost % is still worked on the ex GST figure, so it matches the workbook. Revenue per head uses the MICROS amount.
 - **Every consumption area is read:** all four bar blocks on each event tab, both Menu Tasting blocks, and the Internal Cost Transfer tabs. A filled-in block with no bar name is listed as "Bar 1", "Bar 2"… by position.
 - **Cross-check:** for each event, the units read from the bar blocks are compared with the workbook's own Total block. Any difference is flagged in the review window and the folder's file list.
 - **Every event belongs to its report's day.** The day comes from the Summary date, checked against the file name ("05.xlsm" = the 5th). A tab whose own Date cell says a different day (a typo, or left over from a copied report) is put on the report's day. The difference is shown in the review window, the folder list and on flagged events ("its Date cell says …").

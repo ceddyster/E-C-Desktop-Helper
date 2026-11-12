@@ -617,7 +617,7 @@
   const F = window.CrownFolder;
   const FIRST_SCAN_DAYS = 60;   // on first link, ignore PDFs untouched for longer than this
   // Bump when the TL/BEO readers improve, so files skipped by an older version get read again.
-  const READER_VERSION = 12;
+  const READER_VERSION = 13;
   const pause = () => new Promise((r) => setTimeout(r, 0));
   let folders = [];             // [{ id, handle, perm }]
   let scanningId = null, scanProgress = '';
