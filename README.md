@@ -111,17 +111,15 @@ Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.x
 - **Hiding people you don't need:** hover over someone in the Day or Week view and click **Hide** (or use *Hide from the Managers views* on their roster). They're left off the main-page window and the day and week views for every week, and "N hidden" shows at the bottom. Open **N people hidden** and click **Unhide** to bring someone back. Hidden people can still be picked from the **Person** list (marked *hidden*). This is remembered in this browser.
 - **One allocation per week:** a re-saved or renamed copy of the same week replaces it. Weeks are cleared with the rest of the old data (⚙︎ Settings → keep months).
 
-### Banquet Menu + BEOs → On-consumption sheets
+### BEOs → On-consumption sheets
 
-Link the **Banquet Menu** folder (📁 → **Link another folder**). Each menu PDF (e.g. *EC Menu 2026 - Beer & Cider.pdf*) is read for its beverage items and the section they're under (AUSTRALIAN BEER, IMPORTED BEER, CIDER → *Beer & cider*). Prices are ignored. Menus are read however old they are, since they're valid for a year or more. A menu kept as a workbook with "menu" in its name works too.
+No extra folder is needed: the sheets use the BEOs the dashboard already reads. The sheet is laid out like the ON CONSUMPTION form: **Event Name, Event Date, Bar Location, On consumption** time, then **Product | Consumption** with a line per item, a few blank lines for extras, and **Entered By / Checked By**.
 
-The sheet is laid out like the ON CONSUMPTION form: **Event Name, Event Date, Bar Location, On consumption** time, then **Product | Consumption** with a line per item, a few blank lines for extras, and **Entered By / Checked By**.
-
-- **Pick an event** (from today to two weeks ahead). The name, date, bar(s) from the TL Sheet (or the BEO room) and the on-consumption time are filled in. The time runs from the start of the on-consumption service (including pre-event drinks that are "included in beverage on consumption").
-- **Items** come from the BEO's *Beverages on consumption* list (e.g. "Hahn Super Dry 3.5 @ $11.50 per bottle"), named as on the Banquet Menu and grouped into Sparkling, White wine, Rosé, Red wine, Beer & cider, Non-alcoholic, Soft drinks & juice, Spirits, Cocktails. "Assorted soft drinks and orange juice" becomes Pepsi, Pepsi Max, Soda, Lemonade, Solo, LLD and Orange Juice.
-- **Add an item** by typing in the box (it suggests menu items and picks the section), then **Add**. Anything not on the menu can be typed in too. ✕ removes an item, and names and sections can be edited.
+- **Pick an event** (from today to two weeks ahead). The name, date, bar(s) from the TL Sheet (or the BEO room) and the on-consumption time are filled in. The time runs from the start of the on-consumption service, including pre-event drinks that are "included in beverage on consumption".
+- **Items** are what the BEO lists under *Beverages on consumption*, **exactly as written** and in the same order, without prices ("Hahn Super Dry 3.5 @ $11.50 per bottle" → *Hahn Super Dry 3.5*).
+- **Add an item** by typing it and pressing **Add** (it suggests items from other BEOs). Items can be renamed, moved up or down (↑ ↓), or removed (✕).
 - **A separate sheet for each bar**: list the bars with commas and tick the box to print one page per bar.
-- **Print** prints just the sheet(s), one A4 page each. Your changes are kept as a draft for that event; the window shows *✓ printed* once printed. **Start again from the BEO** throws the changes away.
+- **Print** prints just the sheet(s), one A4 page each. Your changes are kept as a draft for that event, and the window shows *✓ printed* once printed. **Start again from the BEO** throws the changes away.
 - **New sheet (not linked to an event)** for anything that isn't on a BEO.
 
 ### TL Sheet → bar team roster
@@ -200,7 +198,7 @@ js/consumption.js reads bar consumption workbooks
 js/consui.js      bar consumption window + totals panel
 js/mgr.js         reads Manager Allocation workbooks
 js/mgrui.js       Managers on today window + week panel
-js/menu.js        reads Banquet Menus; BEO on-consumption items; name matching
+js/beobev.js      a BEO's "Beverages on consumption" items and times
 js/onconui.js     On-consumption sheets window, builder and printing
 js/slimzip.js     makes big .xlsx/.xlsm files quick to read
 js/folder.js      linked-folder access (File System Access API)
