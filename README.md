@@ -103,7 +103,9 @@ Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.x
 - **A visible line with times or duties but no name** is shown as *Name not filled in*. Template lines with no name and nobody working are left out.
 - **Leave:** RDO, **SL** (sick leave), **AL** (annual leave), LSL and PH show in the week view and on the window's "Off" line, e.g. *Supuni (Sick leave)*. People on leave all week still show; tick **Hide managers who are off all week** to hide them.
 - **Dates:** from the date row under Monday–Sunday, or from the file name if that's missing.
-- **The week view** shows Mon–Sun with today highlighted, ‹ / › to move between loaded weeks and **This week** to come back. Your name (⚙︎ Settings → My name) is highlighted.
+- **Click the window** to open the allocation on **today's roster**: everyone working, earliest start first, with their role and events, and who is off. ‹ / › move a day at a time, **Today** comes back.
+- **Week** shows Mon–Sun for everyone, with today highlighted (‹ / › move a week). Your name (⚙︎ Settings → My name) is highlighted.
+- **Person:** pick someone from the **Person** list, or click a name anywhere in the panel, to see just their roster for the week: each day's start time, events, RDOs and leave. ‹ / › move a week. Choose **Everyone** to go back.
 - **One allocation per week:** a re-saved or renamed copy of the same week replaces it. Weeks are cleared with the rest of the old data (⚙︎ Settings → keep months).
 
 ### TL Sheet → bar team roster

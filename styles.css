@@ -396,3 +396,29 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .mgr-grid tr.mine th { color: var(--mine); }
 .mgr-grid .mgr-sec td { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding-top: 14px; }
 .mgr-grid td.leave .mgr-offtag { border-color: var(--gold); color: var(--text); }
+.mgr-bar { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; margin: 0 0 12px; }
+.mgr-bar label { display: inline-flex; gap: 8px; align-items: center; }
+.mgr-bar select { min-width: 200px; }
+.mgr-bar .mgr-only { margin: 0; }
+.mgr-day { list-style: none; padding: 0; margin: 0; }
+.mgr-day li { display: grid; grid-template-columns: 130px minmax(160px, 260px) 1fr; gap: 6px 14px; align-items: baseline; padding: 9px 8px; border-bottom: 1px solid var(--border); }
+.mgr-day li.empty { display: block; }
+.mgr-day li.today { background: var(--surface-2); }
+.mgr-day li.off .mgr-t { color: var(--muted); }
+.mgr-day li.mine .mgr-who, .mgr-person.mine h3 { color: var(--mine); }
+.mgr-t { font-weight: 600; font-variant-numeric: tabular-nums; }
+.mgr-who .mgr-role { display: block; margin: 1px 0 0; }
+.mgr-what { display: flex; flex-wrap: wrap; gap: 4px; }
+.mgr-chip { font-size: .8rem; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
+.mgr-day li.today .mgr-chip { background: var(--surface); }
+.mgr-offline { margin: 12px 0 0; font-size: .88rem; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.mgr-pick { background: none; border: 0; cursor: pointer; font: inherit; font-weight: 600; color: inherit; text-align: left; padding: 0; }
+.mgr-pick:hover { color: var(--gold); text-decoration: underline; }
+.mgr-person h3 { font-size: 1.05rem; margin: 0 0 2px; }
+.mgr-person .mgr-day { margin-top: 10px; }
+.mgr-day + .mgr-offline .mgr-pick { font-weight: 500; }
+@media (max-width: 600px) {
+  .mgr-day li { grid-template-columns: 90px 1fr; }
+  .mgr-day .mgr-what { grid-column: 1 / -1; }
+}
+.mgr-bar [hidden] { display: none; }

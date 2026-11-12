@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-12g">
+  <link rel="stylesheet" href="styles.css?v=2026-11-12i">
 </head>
 <body>
   <header class="topbar">
@@ -186,13 +186,22 @@
           <p class="muted small" id="mgrRange"></p>
         </div>
         <div class="seg">
-          <button class="btn sm" type="button" id="mgrPrev" aria-label="Previous week">‹</button>
-          <button class="btn sm" type="button" id="mgrThisWeek">This week</button>
-          <button class="btn sm" type="button" id="mgrNext" aria-label="Next week">›</button>
+          <div class="switch" role="group" aria-label="Show">
+            <button type="button" class="sw" data-mgrview="day">Day</button>
+            <button type="button" class="sw" data-mgrview="week">Week</button>
+          </div>
+          <button class="btn sm" type="button" id="mgrPrev" aria-label="Previous">‹</button>
+          <button class="btn sm" type="button" id="mgrToday">Today</button>
+          <button class="btn sm" type="button" id="mgrNext" aria-label="Next">›</button>
           <button class="btn ghost sm" data-close aria-label="Close">✕</button>
         </div>
       </div>
-      <label class="small mgr-only"><input type="checkbox" id="mgrOnlyOn"> Hide managers who are off all week</label>
+      <div class="mgr-bar">
+        <label class="small">Person
+          <select id="mgrPerson"><option value="">Everyone</option></select>
+        </label>
+        <label class="small mgr-only" id="mgrOnlyWrap"><input type="checkbox" id="mgrOnlyOn"> Hide managers who are off all week</label>
+      </div>
       <div class="mgr-grid" id="mgrGrid"></div>
     </div>
   </dialog>
@@ -292,20 +301,20 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-12g"></script>
-  <script src="config.js?v=2026-11-12g"></script>
-  <script src="js/slimzip.js?v=2026-11-12g"></script>
-  <script src="js/parse.js?v=2026-11-12g"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-12g"></script>
-  <script src="js/tl.js?v=2026-11-12g"></script>
-  <script src="js/beo.js?v=2026-11-12g"></script>
-  <script src="js/folder.js?v=2026-11-12g"></script>
-  <script src="js/match.js?v=2026-11-12g"></script>
-  <script src="js/consumption.js?v=2026-11-12g"></script>
-  <script src="js/consui.js?v=2026-11-12g"></script>
-  <script src="js/mgr.js?v=2026-11-12g"></script>
-  <script src="js/mgrui.js?v=2026-11-12g"></script>
-  <script src="js/drive.js?v=2026-11-12g"></script>
-  <script src="js/app.js?v=2026-11-12g"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-12i"></script>
+  <script src="config.js?v=2026-11-12i"></script>
+  <script src="js/slimzip.js?v=2026-11-12i"></script>
+  <script src="js/parse.js?v=2026-11-12i"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-12i"></script>
+  <script src="js/tl.js?v=2026-11-12i"></script>
+  <script src="js/beo.js?v=2026-11-12i"></script>
+  <script src="js/folder.js?v=2026-11-12i"></script>
+  <script src="js/match.js?v=2026-11-12i"></script>
+  <script src="js/consumption.js?v=2026-11-12i"></script>
+  <script src="js/consui.js?v=2026-11-12i"></script>
+  <script src="js/mgr.js?v=2026-11-12i"></script>
+  <script src="js/mgrui.js?v=2026-11-12i"></script>
+  <script src="js/drive.js?v=2026-11-12i"></script>
+  <script src="js/app.js?v=2026-11-12i"></script>
 </body>
 </html>
