@@ -464,7 +464,8 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .oc-head th { width: 32%; background: #eee; }
 .oc-items thead th { background: #eee; }
 .oc-items { table-layout: fixed; }
-.oc-items th, .oc-items td { width: 50%; }
+.oc-items th:first-child, .oc-items td:first-child { width: 40%; }
+.oc-items th.c, .oc-items td.c { width: 60%; }
 .oc-items td { height: 1.75em; }
 #ocPrint { display: none; }
 #ocPrint .oc-sheet { font-size: 11pt; }

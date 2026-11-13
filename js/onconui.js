@@ -93,18 +93,18 @@
       const used = sheet.querySelector('.oc-head').getBoundingClientRect().height + 12
         + sheet.querySelector('.oc-items thead').getBoundingClientRect().height;
       const apply = (each) => {
-        const font = Math.max(8, Math.min(16, each * 1.25));               // pt: bigger text when rows are tall
-        const pad = each < 5 ? '0 8px' : each < 6 ? '1px 8px' : '3px 8px';
+        // Only the boxes grow: the text stays 11pt.
+        const pad = each < 6 ? '1px 8px' : '3px 8px';
         for (const tr of rows) {
           tr.style.height = `${each.toFixed(2)}mm`;
-          for (const td of tr.cells) { td.style.fontSize = `${font.toFixed(1)}pt`; td.style.padding = pad; }
+          for (const td of tr.cells) td.style.padding = pad;
         }
       };
       // Share the space left on the page between the rows, then shrink a little at a time if anything
       // (e.g. a long name that wraps onto two lines) still pushes the sheet past the page.
-      let each = Math.max(4, (PAGE_MM - used / PX_MM) / rows.length);   // mm
+      let each = Math.max(5.2, (PAGE_MM - used / PX_MM) / rows.length);   // mm (11pt text needs about 5.2mm)
       apply(each);
-      while (each > 4 && sheet.getBoundingClientRect().height / PX_MM > PAGE_MM) { each = Math.max(4, each - 0.3); apply(each); }
+      while (each > 5.2 && sheet.getBoundingClientRect().height / PX_MM > PAGE_MM) { each = Math.max(5.2, each - 0.3); apply(each); }
     }
     area.style.cssText = '';
   }
