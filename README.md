@@ -115,7 +115,7 @@ Link the folder that holds the weekly *Managers Allocation 09.11.26 - 15.11.26.x
 
 ### BEOs → On-consumption sheets
 
-No extra folder is needed: the sheets use the BEOs the dashboard already reads. The sheet is laid out like the ON CONSUMPTION form: **Event Name, Event Date, Bar Location, On consumption** time, then **Product | Consumption** with a line per item, a few blank lines for extras, and **Entered By / Checked By**.
+No extra folder is needed: the sheets use the BEOs the dashboard already reads. The sheet is laid out like the ON CONSUMPTION form: **Event Name, Event Date, Bar Location, On consumption** time, then **Product | Consumption** with a line per item and a few blank lines for extras. When printed, the item rows stretch to fill the A4 page (the event details and the Product / Consumption heading stay the same size).
 
 - **Pick an event** (from today to two weeks ahead). The name, date, bar(s) from the TL Sheet (or the BEO room) and the on-consumption time are filled in. The time runs from the start of the on-consumption service, including pre-event drinks that are "included in beverage on consumption".
 - **Only BEOs with a "Beverages on consumption" line** in their Beverage section are listed (in the window and the Event list). Package-only or corkage-only events aren't. Pre-event drinks "included in beverage on consumption" on their own don't count.

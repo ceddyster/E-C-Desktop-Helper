@@ -1,6 +1,6 @@
 /* On-consumption sheets add-on: a printable check-off sheet for an event's bar(s), laid out like the
  * ON CONSUMPTION form (Event Name / Event Date / Bar Location / On consumption time, then Product |
- * Consumption, then "Entered By"). Items are what the event's BEO lists under "Beverages on consumption",
+ * Consumption, rows stretched to fill the page). Items are what the event's BEO lists under "Beverages on consumption",
  * as written there, in the same order; more can be added or removed by hand. Nothing is priced.
  * Sheets being worked on are kept as drafts in this browser, one per event. */
 (function (global) {
@@ -65,9 +65,8 @@
 
   /* ---------- The printed sheet ---------- */
   function sheetHtml(s, bar) {
-    const rows = s.items.length + (+s.blanks || 0);
     const time = s.from ? `${t12(s.from)} – ${s.to ? t12(s.to) : ''}` : '';
-    return `<section class="oc-sheet${rows > 30 ? ' compact' : ''}">
+    return `<section class="oc-sheet">
       <table class="oc-head"><tbody>
         <tr><th>Event Name</th><td>${esc(s.name)}</td></tr>
         <tr><th>Event Date</th><td>${esc(fmtLong(s.date))}</td></tr>
@@ -77,11 +76,38 @@
       <table class="oc-items"><thead><tr><th>Product</th><th class="c">Consumption</th></tr></thead>
         <tbody>${s.items.map((i) => `<tr><td>${esc(i.name)}</td><td class="c"></td></tr>`).join('')}
         ${Array.from({ length: +s.blanks || 0 }, () => '<tr class="oc-blank"><td>&nbsp;</td><td class="c"></td></tr>').join('')}</tbody></table>
-      <table class="oc-foot"><tbody><tr><th>Entered By:</th><td></td><th>Checked By:</th><td></td></tr></tbody></table>
     </section>`;
   }
   const barsOf = (s) => (s.perBar ? s.bars.split(/\s*[,;\n]\s*/).map((b) => b.trim()).filter(Boolean) : [s.bars.trim()]);
   const sheetsHtml = (s) => (barsOf(s).length ? barsOf(s) : ['']).map((b) => sheetHtml(s, b)).join('');
+
+  /* The item rows stretch so the table fills the rest of the A4 page; the event details and the
+   * Product / Consumption heading keep their size. Measured off-screen at the printed width. */
+  const PX_MM = 96 / 25.4;
+  const PAGE_MM = 297 - 2 * 14 - 7;        // A4 less the 14mm margins, less a little to be safe
+  function fitToPage(area) {
+    area.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;width:182mm;';
+    for (const sheet of area.querySelectorAll('.oc-sheet')) {
+      const rows = [...sheet.querySelectorAll('.oc-items tbody tr')];
+      if (!rows.length) continue;
+      const used = sheet.querySelector('.oc-head').getBoundingClientRect().height + 12
+        + sheet.querySelector('.oc-items thead').getBoundingClientRect().height;
+      const apply = (each) => {
+        const font = Math.max(8, Math.min(16, each * 1.25));               // pt: bigger text when rows are tall
+        const pad = each < 5 ? '0 8px' : each < 6 ? '1px 8px' : '3px 8px';
+        for (const tr of rows) {
+          tr.style.height = `${each.toFixed(2)}mm`;
+          for (const td of tr.cells) { td.style.fontSize = `${font.toFixed(1)}pt`; td.style.padding = pad; }
+        }
+      };
+      // Share the space left on the page between the rows, then shrink a little at a time if anything
+      // (e.g. a long name that wraps onto two lines) still pushes the sheet past the page.
+      let each = Math.max(4, (PAGE_MM - used / PX_MM) / rows.length);   // mm
+      apply(each);
+      while (each > 4 && sheet.getBoundingClientRect().height / PX_MM > PAGE_MM) { each = Math.max(4, each - 0.3); apply(each); }
+    }
+    area.style.cssText = '';
+  }
 
   function print() {
     if (!cur) return;
@@ -89,6 +115,7 @@
     let area = $('ocPrint');
     if (!area) { area = document.createElement('div'); area.id = 'ocPrint'; document.body.appendChild(area); }
     area.innerHTML = sheetsHtml(cur);
+    fitToPage(area);
     cur.printedAt = new Date().toISOString(); save();
     document.body.classList.add('printing-oc');
     const done = () => { document.body.classList.remove('printing-oc'); global.removeEventListener('afterprint', done); renderWin(); };

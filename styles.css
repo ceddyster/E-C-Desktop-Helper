@@ -466,19 +466,14 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .oc-items { table-layout: fixed; }
 .oc-items th, .oc-items td { width: 50%; }
 .oc-items td { height: 1.75em; }
-.oc-foot { margin-top: 14px; }
-.oc-foot th { width: 18%; background: #eee; white-space: nowrap; }
-.oc-foot td { height: 2em; }
 #ocPrint { display: none; }
+#ocPrint .oc-sheet { font-size: 11pt; }
+#ocPrint .oc-items td { height: auto; padding: 3px 8px; }
 @media print {
   @page { size: A4; margin: 14mm; }
   body.printing-oc > *:not(#ocPrint) { display: none !important; }
   body.printing-oc { background: #fff !important; margin: 0 !important; padding: 0 !important; display: block !important; max-width: none !important; width: auto !important; }
   body.printing-oc #ocPrint { width: 100%; }
-  #ocPrint .oc-sheet { font-size: 11pt; }
-  #ocPrint .oc-items td { height: 1.55em; padding: 3px 8px; }
-  #ocPrint .oc-sheet.compact .oc-items td { height: 1.3em; padding: 2px 8px; font-size: 10pt; }
-  #ocPrint .oc-foot { break-inside: avoid; }
   body.printing-oc #ocPrint { display: block; }
   #ocPrint .oc-sheet { break-after: page; }
   #ocPrint .oc-sheet:last-child { break-after: auto; }
