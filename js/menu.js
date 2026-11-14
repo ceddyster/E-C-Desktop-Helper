@@ -29,7 +29,7 @@
     [/sparkling/i, 'Sparkling'],
     [/beer|lager|\bale\b|pilsner|pale|draught|hahn|corona|heineken|carlton|crown lager|peroni|asahi|stella|great northern|stone ?& ?wood|xxxx|dingo|byron|little creatures|james squire|cider|seltzer|isla\b|vodka cruiser|furphy|guinness|kirin|coopers|balter|gage roads/i, 'Beer & cider'],
     [/pepsi|coke|coca|cola|lemonade|solo|soda|lld|lemon lime|bitters|ginger ale|ginger beer|tonic|juice|water|sprite|fanta|schweppes|soft drink|mineral|cordial/i, 'Soft drinks & juice'],
-    [/vodka|gin\b|rum\b|whisk|bourbon|tequila|hennes|cognac|brandy|scotch|jameson|jack daniel|liqueur|baileys|aperol|campari|kahlua|midori|spirit/i, 'Spirits'],
+    [/vodka|gin\b|rum\b|whisk|bourbon|tequila|hennes|cognac|brandy|scotch|jameson|jack daniel|liqueur|baileys|aperol|campari|kahlua|midori|spirit|johnnie walker|bacardi|bulleit|ketel one|tanqueray|smirnoff|absolut|bombay|jim beam|canadian club|chivas|glenfiddich|malibu|sambuca|patr[oó]n|jose cuervo|captain morgan|havana club|grey goose|hendrick|four pillars|archie rose|jagermeister|j[aä]germeister|cointreau|frangelico|southern comfort|wild turkey|makers mark|maker's mark|glenlivet|monkey shoulder|beefeater|gordon'?s/i, 'Spirits'],
     [/cocktail|spritz|margarita|martini|mojito/i, 'Cocktails'],
   ];
   const headingCat = (t) => { for (const [re, c] of HEADINGS) if (re.test(t)) return c; return null; };

@@ -19,7 +19,7 @@
       const t = String(raw).trim();
       const r = t.match(RANGE);
       if (r) { range = { from: hm(r[1], r[2]), to: hm(r[3], r[4]) }; inOn = false; continue; }
-      if (/on consumption/i.test(t)) {
+      if (/on consumption/i.test(t) && !/^>/.test(t)) {   // a heading, not a note ("> … beverages on consumption: Hannah")
         // "Beverages on consumption - 4.5 Hours" starts the list. Pre-event drinks "Included in beverage on
         // consumption" also count from their start time.
         if (range && (!out.from || range.from < out.from)) out.from = range.from;
@@ -29,7 +29,7 @@
         continue;
       }
       if (!inOn) continue;
-      if (/^\d+\s*@|beverage notes/i.test(t)) { inOn = false; continue; }
+      if (/^\d*\s*@|beverage notes|corkage|supplied by/i.test(t)) { inOn = false; continue; }
       const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/);
       if (!m) continue;
       if (/assorted soft drinks?/i.test(m[1])) SOFTS.forEach(add);
@@ -42,18 +42,20 @@
    *  items and the products in any beverage package, as written on the BEO. Corkage / client-supplied
    *  drinks aren't included, nor are notes, prices or guest counts. → { items: [names], packages: [package lines] } */
   function orderItems(lines) {
-    const out = { items: [], packages: [] };
+    const out = { items: [], packages: [], clientSupplied: false };
     const add = (name) => { name = name.replace(/\s+/g, ' ').trim(); if (name && !out.items.some((x) => x.toLowerCase() === name.toLowerCase())) out.items.push(name); };
     let mode = '';          // 'on' | 'pkg' | ''
     for (const raw of lines || []) {
       const t = String(raw).replace(/\s+/g, ' ').trim();
       if (!t) continue;
       if (RANGE.test(t)) { mode = ''; continue; }
-      if (/corkage|client supplied|supplied by (the )?client|beverage supplied by|sponsor/i.test(t)) { mode = ''; continue; }
-      if (/beverages? on consumption/i.test(t) && !/^included/i.test(t)) { mode = 'on'; continue; }
+      if (/corkage|client supplied|supplied by (the )?client|beverage supplied by|sponsor/i.test(t)) { if (!/^>/.test(t)) out.clientSupplied = true; mode = ''; continue; }
+      // "Beverages on consumption", "VIP Tables Spirits on Consumption", "Heineken Zero - Consumption"…
+      // (headings, not "> notes"). Soft drinks on consumption aren't ordered here.
+      if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? '' : 'on'; continue; }
       if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) { mode = 'pkg'; out.packages.push(t); continue; }
       if (!mode) continue;
-      if (/^\d+\s*@|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
+      if (/^\d*\s*@|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
       if (/^(please note|the final amount|note:|\*)/i.test(t) || /\bguests?\s*@|per person\b.*\btotal|event spend/i.test(t)) continue;
       if (mode === 'on') { const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/); if (m) add(m[1]); continue; }
       // Package products: one per line, perhaps with "> " in front or a price after.

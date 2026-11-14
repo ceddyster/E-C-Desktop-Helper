@@ -57,7 +57,7 @@
         const type = ch.type || O().guessType(e);
         const guests = ch.guests != null && ch.guests !== '' ? +ch.guests : +e.pax || 0;
         const r = O().compute({ type, guests, products, primary: ch.primary || {}, params: getParams() });
-        out.push({ e, key, type, guessed: !ch.type, guests, guestsEdited: ch.guests != null && ch.guests !== '', products, tables: r.tables, lines: r.lines, packages: bev.packages, primary: ch.primary || {} });
+        out.push({ e, key, clientSupplied: bev.clientSupplied, type, guessed: !ch.type, guests, guestsEdited: ch.guests != null && ch.guests !== '', products, tables: r.tables, lines: r.lines, packages: bev.packages, primary: ch.primary || {} });
       }
     }
     return out;
@@ -102,6 +102,7 @@
           ${x.type !== 'cocktail' && x.type !== 'tasting' ? `<span class="small muted">${x.tables} table${x.tables === 1 ? '' : 's'}</span>` : ''}</div>
       </div>
       ${!x.guests && x.type !== 'tasting' ? '<p class="win-warn">⚠ No guest number on the BEO: enter it to work out the order.</p>' : ''}
+      ${x.clientSupplied && x.type !== 'tasting' ? '<p class="win-warn">⚠ The client supplies some of the drinks (corkage / sponsored), so only the items on consumption or in a package are ordered here, but the figures still assume they\'re for every guest. Check the bottles, and change the guests or set an item to "Not ordered" if needed.</p>' : ''}
       ${picks ? `<div class="ord-picks">${picks}</div>` : ''}
       <table class="ord-tbl"><tbody>${x.products.map((p) => { const l = bottles(p.name);
         return `<tr class="${p.cat === 'none' ? 'ord-none' : ''}"><td>${esc(p.name)}</td><td>${catSel(p)}</td><td class="n">${p.cat === 'none' || (x.type === 'tasting' && !l.bottles) ? '—' : `<b>${(l.bottles || 0).toLocaleString('en-AU')}</b> btl`}</td><td class="muted small">${esc(l.how || '')}</td></tr>`; }).join('')}</tbody></table>
