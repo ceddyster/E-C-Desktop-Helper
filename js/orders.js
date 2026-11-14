@@ -19,7 +19,7 @@
   'use strict';
 
   const TYPES = [['sports', 'Seated Sports'], ['corporate', 'Seated Corporate'], ['wedding', 'Seated Wedding'], ['cocktail', 'Cocktail / Networking / Sundowner'], ['tasting', 'Menu Tasting']];
-  const CATS = [['sparkling', 'Sparkling'], ['white', 'White wine'], ['red', 'Red wine'], ['beer', 'Beer'], ['light', 'Light beer (incl. mid, zero, cider)'], ['spirits', 'Spirits'], ['none', 'Not ordered (soft drinks etc.)']];
+  const CATS = [['sparkling', 'Sparkling'], ['white', 'White wine'], ['red', 'Red wine'], ['beer', 'Beer'], ['light', 'Light beer (incl. mid, zero, cider)'], ['spirits', 'Spirits'], ['none', 'Soft drinks & other (enter amounts)']];
   const CAT_NAME = Object.fromEntries(CATS);
 
   const DEFAULTS = {

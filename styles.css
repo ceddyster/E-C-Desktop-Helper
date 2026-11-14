@@ -527,3 +527,8 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
 .ord-par th, .ord-par td { padding: 3px 6px; text-align: left; }
 .ord-par th { color: var(--muted); font-weight: 500; }
 .ord-par input { width: 64px; }
+.ord-qty { width: 76px; text-align: right; }
+.ord-qty.set { border-color: var(--gold); font-weight: 700; }
+.ord-added { font-size: .72rem; padding: 1px 6px; border-radius: 99px; background: var(--gold-soft); margin-left: 4px; }
+.ord-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.ord-add input[type=text] { flex: 1 1 220px; min-width: 0; }

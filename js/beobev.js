@@ -42,24 +42,25 @@
    *  items and the products in any beverage package, as written on the BEO. Corkage / client-supplied
    *  drinks aren't included, nor are notes, prices or guest counts. → { items: [names], packages: [package lines] } */
   function orderItems(lines) {
-    const out = { items: [], packages: [], clientSupplied: false };
+    const out = { items: [], packages: [], clientSupplied: false, soft: false };
     const add = (name) => { name = name.replace(/\s+/g, ' ').trim(); if (name && !out.items.some((x) => x.toLowerCase() === name.toLowerCase())) out.items.push(name); };
-    let mode = '';          // 'on' | 'pkg' | ''
+    let mode = '';          // 'on' | 'pkg' | 'soft' | ''
     for (const raw of lines || []) {
       const t = String(raw).replace(/\s+/g, ' ').trim();
       if (!t) continue;
       if (RANGE.test(t)) { mode = ''; continue; }
       if (/corkage|client supplied|supplied by (the )?client|beverage supplied by|sponsor/i.test(t)) { if (!/^>/.test(t)) out.clientSupplied = true; mode = ''; continue; }
       // "Beverages on consumption", "VIP Tables Spirits on Consumption", "Heineken Zero - Consumption"…
-      // (headings, not "> notes"). Soft drinks on consumption aren't ordered here.
-      if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? '' : 'on'; continue; }
+      // (headings, not "> notes"). Soft drinks (on consumption or a package) are listed, but not ordered.
+      if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? 'soft' : 'on'; if (mode === 'soft') out.soft = true; continue; }
       if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) {
-        if (/soft drinks?/i.test(t)) { mode = ''; continue; }        // soft drink packages aren't ordered here
+        if (/soft drinks?/i.test(t)) { mode = 'soft'; out.soft = true; continue; }
         mode = 'pkg'; out.packages.push(t); continue;
       }
       if (!mode) continue;
       if (/^\d*\s*@|^\d+\s*(\(.*?\)\s*)?guests?\b|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
       if (/^(please note|the final amount|note:|\*)/i.test(t) || /\bguests?\s*@|per person\b.*\btotal|event spend/i.test(t)) continue;
+      if (mode === 'soft') { add(t.replace(/^>\s*/, '').replace(/\s*@\s*\$.*$/, '')); continue; }
       if (mode === 'on') { const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/); if (m) add(m[1]); continue; }
       // Package products: one per line, perhaps with "> " in front or a price after.
       const name = t.replace(/^>\s*/, '').replace(/\s*@\s*\$.*$/, '').replace(/^\d+\s*x\s*/i, '');

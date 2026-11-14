@@ -142,6 +142,11 @@ Open **Bar orders**, choose **From / To** dates (or *Next 7 / 14 days*), and eve
 - Package-only wines that aren't on any menu are built in: **Woodbrook Vineyards NV Brut Cuvee** (sparkling), **Brigade Block Semillon Sauvignon Blanc** (white) and **Abilene Shiraz** (red).
 - **Several light beers** (or sparkling wines) on one event share the category's total: 500 guests at a seated corporate event = 1,000 light beers in total, split between however many light beers are on the BEO.
 - A product's **category** comes from the Banquet Menu; one marked **?** isn't on a linked menu, so it was guessed from the name. Any category can be changed with its drop-down, and that's remembered for that product.
+- **Change an amount**: each item has a *btl* box showing the worked-out amount in grey. Type a number to order that instead (it shows in bold, with the worked-out amount beside it); clear the box to go back.
+- **Add an item** to an event with the box under its items: the product (it suggests products from the menus and BEOs), its category, and optionally the bottles. Added items are tagged *added* and can be removed.
+- **Soft drink only events** (soft drink packages or soft drinks on consumption) are listed too; nothing is ordered for them unless you enter an amount or add an item. Soft drinks and anything else in *Soft drinks & other* are only ordered when you enter an amount.
+- **Hide** leaves an event out of the order and the workbook; *N events hidden* at the bottom brings it back with **Show**.
+- Everything you change (type, guests, primary, amounts, added items, hidden) is remembered per event in this browser.
 - **Ordering figures** (at the bottom of the panel) can be changed; *Put back the original figures* restores them.
 
 ### TL Sheet → bar team roster
