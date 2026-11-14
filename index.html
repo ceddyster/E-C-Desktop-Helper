@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-13b">
+  <link rel="stylesheet" href="styles.css?v=2026-11-14a">
 </head>
 <body>
   <header class="topbar">
@@ -86,7 +86,17 @@
       </div>
       <ul class="win-list" id="ocWinList"></ul>
     </section>
-    <section class="card placeholder"><span>Add-on slot 4</span></section>
+    <!-- BAR ORDERS (compact: next 7 days by category) -->
+    <section class="card win" id="ordWin" tabindex="0" role="button" aria-label="Open bar orders">
+      <div class="win-head">
+        <div>
+          <h2>Bar orders</h2>
+          <p class="muted small" id="ordWinSub"></p>
+        </div>
+        <span class="win-open" aria-hidden="true">Orders ›</span>
+      </div>
+      <div id="ordWinBody"></div>
+    </section>
   </main>
 
   <!-- DAY DETAIL -->
@@ -261,6 +271,33 @@
     </div>
   </dialog>
 
+  <!-- BAR ORDERS -->
+  <dialog id="ordDlg" class="dlg panel" aria-labelledby="ordTitle">
+    <div class="dlg-inner">
+      <div class="card-head">
+        <div>
+          <h2 id="ordTitle">Bar orders</h2>
+          <p class="muted small" id="ordCount"></p>
+        </div>
+        <div class="seg">
+          <button class="btn primary sm" type="button" id="ordExcel">⬇ Excel workbook</button>
+          <button class="btn ghost sm" data-close aria-label="Close">✕</button>
+        </div>
+      </div>
+      <div class="ord-bar">
+        <label class="small">From <input type="date" id="ordFrom"></label>
+        <label class="small">To <input type="date" id="ordTo"></label>
+        <span class="seg small"><button class="btn sm" type="button" data-ord-range="7">Next 7 days</button><button class="btn sm" type="button" data-ord-range="14">Next 14 days</button></span>
+      </div>
+      <p class="muted small" id="ordMenuNote"></p>
+      <div class="ord-wrap">
+        <section><h3 class="label">Order totals</h3><div id="ordTotals"></div></section>
+        <section><h3 class="label">Events</h3><div id="ordEvents"></div></section>
+      </div>
+      <details class="ord-figs"><summary>Ordering figures</summary><div id="ordParams"></div></details>
+    </div>
+  </dialog>
+
   <!-- IMPORT REVIEW -->
   <dialog id="importDlg" class="dlg wide">
     <form method="dialog" class="dlg-inner">
@@ -356,22 +393,25 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-13b"></script>
-  <script src="config.js?v=2026-11-13b"></script>
-  <script src="js/slimzip.js?v=2026-11-13b"></script>
-  <script src="js/parse.js?v=2026-11-13b"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-13b"></script>
-  <script src="js/tl.js?v=2026-11-13b"></script>
-  <script src="js/beo.js?v=2026-11-13b"></script>
-  <script src="js/beobev.js?v=2026-11-13b"></script>
-  <script src="js/folder.js?v=2026-11-13b"></script>
-  <script src="js/match.js?v=2026-11-13b"></script>
-  <script src="js/consumption.js?v=2026-11-13b"></script>
-  <script src="js/consui.js?v=2026-11-13b"></script>
-  <script src="js/mgr.js?v=2026-11-13b"></script>
-  <script src="js/mgrui.js?v=2026-11-13b"></script>
-  <script src="js/onconui.js?v=2026-11-13b"></script>
-  <script src="js/drive.js?v=2026-11-13b"></script>
-  <script src="js/app.js?v=2026-11-13b"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-14a"></script>
+  <script src="config.js?v=2026-11-14a"></script>
+  <script src="js/slimzip.js?v=2026-11-14a"></script>
+  <script src="js/parse.js?v=2026-11-14a"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-14a"></script>
+  <script src="js/tl.js?v=2026-11-14a"></script>
+  <script src="js/beo.js?v=2026-11-14a"></script>
+  <script src="js/beobev.js?v=2026-11-14a"></script>
+  <script src="js/folder.js?v=2026-11-14a"></script>
+  <script src="js/match.js?v=2026-11-14a"></script>
+  <script src="js/consumption.js?v=2026-11-14a"></script>
+  <script src="js/consui.js?v=2026-11-14a"></script>
+  <script src="js/mgr.js?v=2026-11-14a"></script>
+  <script src="js/mgrui.js?v=2026-11-14a"></script>
+  <script src="js/menu.js?v=2026-11-14a"></script>
+  <script src="js/orders.js?v=2026-11-14a"></script>
+  <script src="js/ordersui.js?v=2026-11-14a"></script>
+  <script src="js/onconui.js?v=2026-11-14a"></script>
+  <script src="js/drive.js?v=2026-11-14a"></script>
+  <script src="js/app.js?v=2026-11-14a"></script>
 </body>
 </html>

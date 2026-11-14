@@ -496,3 +496,34 @@ a.btn { text-decoration: none; text-align: center; display: inline-block; }
   .win-list li { padding: 7px 0; }
   .placeholder { min-height: 0; }
 }
+
+/* Bar orders */
+.ord-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 6px; }
+.ord-bar label { display: inline-flex; gap: 6px; align-items: center; }
+.ord-wrap { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); gap: 24px; margin-top: 10px; }
+@media (max-width: 900px) { .ord-wrap { grid-template-columns: 1fr; } }
+.ord-tot { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.ord-tot th, .ord-tot td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.ord-tot .n, .ord-tbl .n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ord-tot th { color: var(--muted); font-weight: 500; }
+.ord-cat-row td { font-weight: 700; background: var(--surface-2); }
+.ord-prod { padding-left: 20px !important; }
+.ord-ev { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.ord-ev-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
+.ord-ev-opts { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.ord-guests { width: 80px; }
+.ord-picks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 8px; font-size: .85rem; }
+.ord-pick { display: inline-flex; gap: 6px; align-items: center; }
+.ord-tbl { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.ord-tbl td { padding: 4px 6px; border-top: 1px solid var(--border); vertical-align: middle; }
+.ord-tbl tr.ord-none td:first-child { color: var(--muted); }
+.ord-cat { font-size: .82rem; max-width: 200px; }
+.ord-guess { display: inline-block; width: 1.2em; text-align: center; border-radius: 50%; background: var(--gold-soft); font-size: .75rem; font-weight: 700; cursor: help; }
+.ord-figs { margin-top: 16px; }
+.ord-figs summary { cursor: pointer; font-weight: 600; }
+.ord-par-grid { display: flex; flex-wrap: wrap; gap: 24px; margin: 10px 0; }
+.ord-par { border-collapse: collapse; font-size: .88rem; }
+.ord-par caption { text-align: left; font-weight: 600; padding-bottom: 6px; }
+.ord-par th, .ord-par td { padding: 3px 6px; text-align: left; }
+.ord-par th { color: var(--muted); font-weight: 500; }
+.ord-par input { width: 64px; }

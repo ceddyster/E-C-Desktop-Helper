@@ -295,6 +295,11 @@
         throw new Error(`looks like a TL Sheet but has no bar tabs. Tabs: ${names.slice(0, 15).join(', ')}${names.length > 15 ? '…' : ''}`);
       }
     }
+    if (!isText && global.CrownMenu && global.CrownMenu.nameSaysMenu(name)) {
+      // A Banquet Menu kept as a workbook (product categories for the bar orders).
+      const lines = global.CrownMenu.sheetLines(global.XLSX.read(buf, { type: 'array' }));
+      if (global.CrownMenu.looksLike(name, lines)) return [menuSheet(global.CrownMenu.read(name, lines))];
+    }
     if (!isText && global.CrownMgr) {
       // Manager allocation workbooks: "… Manager Allocation" title above a Monday–Sunday row.
       if (global.CrownMgr.looksLike(global.XLSX.read(buf, { type: 'array', sheetRows: 6 }))) {
@@ -358,10 +363,22 @@
   }
 
   /** Reads one file → [{label, kind, ...sheet}] or a ready result for ics/json. */
+  const menuSheet = (menu) => ({ label: `Banquet menu · ${menu.items.length} beverage item${menu.items.length === 1 ? '' : 's'}`, kind: 'ready', isMenu: true, menu,
+    ready: { events: [], shifts: [], warnings: [] } });
+
   /** `path`: where the file sits in a linked folder ("2026/05 - May/30.xlsm"), when known. */
   async function readFile(name, buf, path) {
     const ext = (name.split('.').pop() || '').toLowerCase();
-    if (ext === 'pdf') return global.CrownBEO.readBEO(name, buf);
+    if (ext === 'pdf') {
+      try { return await global.CrownBEO.readBEO(name, buf.slice(0)); } catch (e) {
+        // Not a BEO: maybe a Banquet Menu (which category each product is in, for the bar orders).
+        if (!/doesn't look like a BEO/.test(e.message) || !global.CrownMenu) throw e;
+        const pages = await global.CrownBEO.readItems(buf);
+        const lines = global.CrownMenu.pdfLines(pages, global.CrownBEO.toLines, global.CrownBEO.lineText);
+        if (!global.CrownMenu.looksLike(name, lines)) throw e;
+        return [menuSheet(global.CrownMenu.read(name, lines))];
+      }
+    }
     if (ext === 'url' || ext === 'website') throw new Error('that\'s a shortcut (.url), not the workbook, so it can\'t be read. Link the synced SharePoint folder instead (see Documents), or download a copy of the TL Sheet and load the .xlsx.');
     if (ext === 'ics') {
       const events = parseIcs(new TextDecoder().decode(buf));

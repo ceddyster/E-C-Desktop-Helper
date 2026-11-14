@@ -38,5 +38,30 @@
     return out;
   }
 
-  global.CrownBeoBev = { fromBEO };
+  /** Every product the bar has to supply for an event, for the bar orders: the "Beverages on consumption"
+   *  items and the products in any beverage package, as written on the BEO. Corkage / client-supplied
+   *  drinks aren't included, nor are notes, prices or guest counts. → { items: [names], packages: [package lines] } */
+  function orderItems(lines) {
+    const out = { items: [], packages: [] };
+    const add = (name) => { name = name.replace(/\s+/g, ' ').trim(); if (name && !out.items.some((x) => x.toLowerCase() === name.toLowerCase())) out.items.push(name); };
+    let mode = '';          // 'on' | 'pkg' | ''
+    for (const raw of lines || []) {
+      const t = String(raw).replace(/\s+/g, ' ').trim();
+      if (!t) continue;
+      if (RANGE.test(t)) { mode = ''; continue; }
+      if (/corkage|client supplied|supplied by (the )?client|beverage supplied by|sponsor/i.test(t)) { mode = ''; continue; }
+      if (/beverages? on consumption/i.test(t) && !/^included/i.test(t)) { mode = 'on'; continue; }
+      if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) { mode = 'pkg'; out.packages.push(t); continue; }
+      if (!mode) continue;
+      if (/^\d+\s*@|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
+      if (/^(please note|the final amount|note:|\*)/i.test(t) || /\bguests?\s*@|per person\b.*\btotal|event spend/i.test(t)) continue;
+      if (mode === 'on') { const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/); if (m) add(m[1]); continue; }
+      // Package products: one per line, perhaps with "> " in front or a price after.
+      const name = t.replace(/^>\s*/, '').replace(/\s*@\s*\$.*$/, '').replace(/^\d+\s*x\s*/i, '');
+      if (name.length >= 3 && name.length <= 80 && !/hours?\b|minutes?\b|^(includes?|selection of|choice of)\b/i.test(name)) add(name);
+    }
+    return out;
+  }
+
+  global.CrownBeoBev = { fromBEO, orderItems };
 })(window);
