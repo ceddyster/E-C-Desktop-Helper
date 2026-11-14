@@ -13,11 +13,12 @@
  * category's total is shared in the same proportions (reds 15 : 10, whites 20 : 15, beers 30 : 25).
  * Three or more: the others share the "2" amount. A category with only a "1" (sparkling, light beer) is
  * shared equally. Spirits: 6 bottles of each. Soft drinks and anything else aren't ordered here.
- * Light beer includes light, mid-strength, zero-alcohol beer and cider. Rosé counts as white wine. */
+ * Light beer includes light, mid-strength, zero-alcohol beer and cider. Rosé counts as white wine.
+ * Menu Tasting: 1 bottle of each wine; beers (and anything else) aren't ordered. */
 (function (global) {
   'use strict';
 
-  const TYPES = [['sports', 'Seated Sports'], ['corporate', 'Seated Corporate'], ['wedding', 'Seated Wedding'], ['cocktail', 'Cocktail / Networking / Sundowner']];
+  const TYPES = [['sports', 'Seated Sports'], ['corporate', 'Seated Corporate'], ['wedding', 'Seated Wedding'], ['cocktail', 'Cocktail / Networking / Sundowner'], ['tasting', 'Menu Tasting']];
   const CATS = [['sparkling', 'Sparkling'], ['white', 'White wine'], ['red', 'Red wine'], ['beer', 'Beer'], ['light', 'Light beer (incl. mid, zero, cider)'], ['spirits', 'Spirits'], ['none', 'Not ordered (soft drinks etc.)']];
   const CAT_NAME = Object.fromEntries(CATS);
 
@@ -42,6 +43,7 @@
   function guessType(e) {
     const b = e.beo || {};
     const text = [e.title, e.subtitle, b.beoName, b.type, ...(b.functions || []).map((f) => f.event)].filter(Boolean).join(' ').toLowerCase();
+    if (/menu tasting/.test(text)) return 'tasting';
     if (/wedding/.test(text)) return 'wedding';
     if (/cocktail|networking|sundowner|canap|drinks reception|stand[- ]?up/.test(text)) return 'cocktail';
     if (/sport|football|\bafl\b|cricket|rugby|racing|grand final|brownlow|medal/.test(text)) return 'sports';
@@ -76,6 +78,14 @@
   function compute({ type, guests, products, primary, params }) {
     const P = params || DEFAULTS;
     const pax = Math.max(0, +guests || 0);
+    if (type === 'tasting') {
+      const lines = products.map((p) => (['sparkling', 'white', 'red'].includes(p.cat)
+        ? { name: p.name, cat: p.cat, bottles: 1, how: 'menu tasting: 1 bottle of each wine' }
+        : { name: p.name, cat: p.cat, bottles: 0, how: p.cat === 'none' ? 'not ordered' : 'menu tasting: only wine is ordered' }));
+      const order = CATS.map((c) => c[0]);
+      lines.sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat));
+      return { tables: 0, lines };
+    }
     const seated = type !== 'cocktail';
     const tables = seated ? Math.ceil(pax / (P.seated.perTable || 10)) : 0;
     const lines = [];

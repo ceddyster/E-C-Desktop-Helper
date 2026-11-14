@@ -89,7 +89,7 @@
     const groups = {};
     for (const p of x.products) (groups[p.cat] = groups[p.cat] || []).push(p);
     // Primary pickers: two or more of a kind where it makes a difference.
-    const picks = ['red', 'white', 'beer'].filter((c) => (groups[c] || []).length > 1).map((c) => {
+    const picks = x.type === 'tasting' ? '' : ['red', 'white', 'beer'].filter((c) => (groups[c] || []).length > 1).map((c) => {
       const cur = x.primary[c] && groups[c].some((p) => p.name === x.primary[c]) ? x.primary[c] : groups[c][0].name;
       return `<label class="ord-pick">Primary ${esc(O().CAT_NAME[c].toLowerCase())} <select data-ord-primary="${esc(x.key)}" data-cat="${c}">${groups[c].map((p) => `<option ${p.name === cur ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>`;
     }).join('');
@@ -99,12 +99,12 @@
         <div><b>${esc(x.e.title)}</b><span class="muted small"> · ${esc(fmtShort(x.e.date))}${x.e.beo.number ? ` · BEO ${esc(x.e.beo.number)}` : ''}${x.e.subtitle ? ` · ${esc(x.e.subtitle)}` : ''}</span></div>
         <div class="ord-ev-opts">${typeSel(x)}${x.guessed ? '' : ' <span class="muted small">(set by you)</span>'}
           <label class="small">Guests <input type="number" min="0" value="${x.guests}" data-ord-guests="${esc(x.key)}" class="ord-guests"></label>
-          ${x.type !== 'cocktail' ? `<span class="small muted">${x.tables} table${x.tables === 1 ? '' : 's'}</span>` : ''}</div>
+          ${x.type !== 'cocktail' && x.type !== 'tasting' ? `<span class="small muted">${x.tables} table${x.tables === 1 ? '' : 's'}</span>` : ''}</div>
       </div>
-      ${!x.guests ? '<p class="win-warn">⚠ No guest number on the BEO: enter it to work out the order.</p>' : ''}
+      ${!x.guests && x.type !== 'tasting' ? '<p class="win-warn">⚠ No guest number on the BEO: enter it to work out the order.</p>' : ''}
       ${picks ? `<div class="ord-picks">${picks}</div>` : ''}
       <table class="ord-tbl"><tbody>${x.products.map((p) => { const l = bottles(p.name);
-        return `<tr class="${p.cat === 'none' ? 'ord-none' : ''}"><td>${esc(p.name)}</td><td>${catSel(p)}</td><td class="n">${p.cat === 'none' ? '—' : `<b>${(l.bottles || 0).toLocaleString('en-AU')}</b> btl`}</td><td class="muted small">${esc(l.how || '')}</td></tr>`; }).join('')}</tbody></table>
+        return `<tr class="${p.cat === 'none' ? 'ord-none' : ''}"><td>${esc(p.name)}</td><td>${catSel(p)}</td><td class="n">${p.cat === 'none' || (x.type === 'tasting' && !l.bottles) ? '—' : `<b>${(l.bottles || 0).toLocaleString('en-AU')}</b> btl`}</td><td class="muted small">${esc(l.how || '')}</td></tr>`; }).join('')}</tbody></table>
     </article>`;
   }
 
@@ -176,7 +176,7 @@
     X.utils.book_append_sheet(wb, ws1, 'Order');
     // Sheet 2: each event.
     const ev = [['Date', 'Event', 'BEO #', 'Event type', 'Guests', 'Tables', 'Product', 'Category', 'Bottles', 'How it was worked out']];
-    for (const x of list) for (const l of x.lines) if (l.cat !== 'none') ev.push([fmtDMY(x.e.date), x.e.title, x.e.beo.number || '', typeName[x.type], x.guests, x.type === 'cocktail' ? '' : x.tables, l.name, O().CAT_NAME[l.cat], l.bottles, l.how]);
+    for (const x of list) for (const l of x.lines) if (l.cat !== 'none' && l.bottles) ev.push([fmtDMY(x.e.date), x.e.title, x.e.beo.number || '', typeName[x.type], x.guests, x.type === 'cocktail' || x.type === 'tasting' ? '' : x.tables, l.name, O().CAT_NAME[l.cat], l.bottles, l.how]);
     const ws2 = X.utils.aoa_to_sheet(ev);
     ws2['!cols'] = [{ wch: 11 }, { wch: 34 }, { wch: 8 }, { wch: 22 }, { wch: 7 }, { wch: 7 }, { wch: 40 }, { wch: 22 }, { wch: 8 }, { wch: 46 }];
     X.utils.book_append_sheet(wb, ws2, 'By event');

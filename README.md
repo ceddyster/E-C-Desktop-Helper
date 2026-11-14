@@ -131,11 +131,12 @@ Link the **Banquet Menu** folder (📁 → **Link another folder**). The menus a
 
 Open **Bar orders**, choose **From / To** dates (or *Next 7 / 14 days*), and every event in that range whose BEO has beverages **on consumption** or a **beverage package** is listed (corkage / client-supplied drinks aren't counted), with the bottles each product needs and the order totals by category. **⬇ Excel workbook** downloads the order to print: *Order* (by category and product, with totals), *By event* (each event's products, bottles and how they were worked out) and *Figures used*.
 
-- **Event type**: *Seated Sports*, *Seated Corporate*, *Seated Wedding* or *Cocktail / Networking / Sundowner*. It's read from the BEO (wedding, sports/football, cocktail/networking/sundowner/canapé); anything else is Seated Corporate. Change it per event with the drop-down.
+- **Event type**: *Seated Sports*, *Seated Corporate*, *Seated Wedding*, *Cocktail / Networking / Sundowner* or *Menu Tasting*. It's read from the BEO (menu tasting, wedding, sports/football, cocktail/networking/sundowner/canapé); anything else is Seated Corporate. Change it per event with the drop-down.
 - **Guests** come from the BEO; change them per event if needed. Tables = guests ÷ 10, rounded up.
 - **Seated**: beer = guests × per person (Sports 5, Corporate 3, Wedding 3); light beer = guests × per person (Sports 3, Corporate 2, Wedding 2); red and white wine = tables × 2.5; sparkling = tables × 5.
 - **Cocktail**: guests × glasses per person × assumption % ÷ glasses per bottle (Sparkling 2 × 30% ÷ 4; Red 1 & 2: 2 × 15% / 10% ÷ 6; White 1 & 2: 2 × 20% / 15% ÷ 7; Beer 1 & 2: 3 × 30% / 25%; Light beer: 2 × 10%).
 - **Two of a kind** (two reds, whites or beers): pick the **primary**. It's "1" and the other is "2". On seated events the category's total is shared the same way (reds 15 : 10, whites 20 : 15, beers 30 : 25). Three or more: the others share the "2" amount. Two sparkling or light beers share equally.
+- **Menu Tasting**: 1 bottle of each wine (sparkling, white, rosé, red). Beers and anything else on the BEO aren't ordered.
 - **Light beer** includes light, mid-strength, zero-alcohol beer and cider. **Rosé** counts as white wine. **Spirits**: 6 bottles of each. **Soft drinks** aren't ordered here.
 - Everything is in **whole bottles**, rounded up. Stock on hand isn't taken into account.
 - A product's **category** comes from the Banquet Menu; one marked **?** isn't on a linked menu, so it was guessed from the name. Any category can be changed with its drop-down, and that's remembered for that product.
