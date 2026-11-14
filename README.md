@@ -139,6 +139,8 @@ Open **Bar orders**, choose **From / To** dates (or *Next 7 / 14 days*), and eve
 - **Menu Tasting**: 1 bottle of each wine (sparkling, white, rosé, red). Beers and anything else on the BEO aren't ordered.
 - **Light beer** includes light, mid-strength, zero-alcohol beer and cider. **Rosé** counts as white wine. **Spirits**: 6 bottles of each. **Soft drinks** aren't ordered here.
 - Everything is in **whole bottles**, rounded up. Stock on hand isn't taken into account.
+- Package-only wines that aren't on any menu are built in: **Woodbrook Vineyards NV Brut Cuvee** (sparkling), **Brigade Block Semillon Sauvignon Blanc** (white) and **Abilene Shiraz** (red).
+- **Several light beers** (or sparkling wines) on one event share the category's total: 500 guests at a seated corporate event = 1,000 light beers in total, split between however many light beers are on the BEO.
 - A product's **category** comes from the Banquet Menu; one marked **?** isn't on a linked menu, so it was guessed from the name. Any category can be changed with its drop-down, and that's remembered for that product.
 - **Ordering figures** (at the bottom of the panel) can be changed; *Put back the original figures* restores them.
 

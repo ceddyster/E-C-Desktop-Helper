@@ -50,10 +50,18 @@
     return 'corporate';
   }
 
-  /** A product's category for ordering: from the Banquet Menu when it's on one, else from its name. */
+  // Wines only sold in beverage packages, so they're not on the Banquet Menus.
+  const PACKAGE_ONLY = [
+    { name: 'Woodbrook Vineyards NV Brut Cuvee', cat: 'Sparkling' },
+    { name: 'Brigade Block Semillon Sauvignon Blanc', cat: 'White wine' },
+    { name: 'Abilene Shiraz', cat: 'Red wine' },
+  ];
+
+  /** A product's category for ordering: from the Banquet Menu (or the package-only list) when it's on one,
+   *  else from its name. */
   function categorise(name, menuItems) {
     const M = global.CrownMenu;
-    const m = M && menuItems && menuItems.length ? M.bestMatch(name, menuItems) : null;
+    const m = M ? M.bestMatch(name, [...(menuItems || []), ...PACKAGE_ONLY]) : null;
     // The BEO's name plus the menu's name for it ("James Squire Orchard Crush Apple" is "… Apple Cider" on the menu).
     const n = `${name} ${m ? m.name : ''}`.toLowerCase();
     const cat = m ? m.cat : M ? M.guessCat(name) : 'Other';
@@ -73,6 +81,7 @@
     return { cat: c, fromMenu: !!m };
   }
 
+  const fmtN = (x) => (Math.round(x * 10) / 10).toLocaleString('en-AU');
   const up = (x) => Math.max(0, Math.ceil(x - 1e-9));
 
   /** Bottles for one event. products: [{ name, cat }] in BEO order; primary: { red: name, … }.
@@ -109,10 +118,11 @@
           lines.push({ name: ordered[0].name, cat, bottles: up(total * w1 / share), how: `${basis}; primary ${w1} of ${share} parts` });
           const rest = ordered.slice(1);
           rest.forEach((p) => lines.push({ name: p.name, cat, bottles: up(total * w2 / share / rest.length), how: `${basis}; ${w2} of ${share} parts${rest.length > 1 ? ` shared by ${rest.length}` : ''}` }));
-        } else ordered.forEach((p) => lines.push({ name: p.name, cat, bottles: up(total / ordered.length), how: `${basis}${ordered.length > 1 ? `, shared by ${ordered.length}` : ''}` }));
+        } else ordered.forEach((p) => lines.push({ name: p.name, cat, bottles: up(total / ordered.length),
+          how: ordered.length > 1 ? `${basis} = ${fmtN(total)} bottles in total, shared by ${ordered.length}` : basis }));
       } else {
         const q = (s) => pax * s.gpp * s.pct / 100 / s.gpb;
-        const desc = (s, n) => `${pax} guests × ${s.gpp} × ${s.pct}% ÷ ${s.gpb}${n > 1 ? `, shared by ${n}` : ''}`;
+        const desc = (s, n) => `${pax} guests × ${s.gpp} × ${s.pct}% ÷ ${s.gpb}${n > 1 ? ` = ${fmtN(q(s))} bottles in total, shared by ${n}` : ''}`;
         if (!slots.length) continue;
         if (ordered.length === 1 || slots.length === 1) ordered.forEach((p) => lines.push({ name: p.name, cat, bottles: up(q(slots[0]) / ordered.length), how: desc(slots[0], ordered.length) }));
         else {

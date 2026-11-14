@@ -84,7 +84,7 @@
 
   /* ---------- Panel ---------- */
   const typeSel = (x) => `<select data-ord-type="${esc(x.key)}" aria-label="Event type">${O().TYPES.map(([v, n]) => `<option value="${v}" ${v === x.type ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
-  const catSel = (p) => `<select class="ord-cat" data-ord-cat="${esc(p.name)}" aria-label="Category of ${esc(p.name)}" title="${p.edited ? 'Category set by you' : p.fromMenu ? 'From the Banquet Menu' : 'Guessed from the name: not on a linked Banquet Menu'}">${O().CATS.map(([v, n]) => `<option value="${v}" ${v === p.cat ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${!p.fromMenu && !p.edited && p.cat !== 'none' ? ' <span class="ord-guess" title="Not on a linked Banquet Menu: category guessed from the name">?</span>' : ''}`;
+  const catSel = (p) => `<select class="ord-cat" data-ord-cat="${esc(p.name)}" aria-label="Category of ${esc(p.name)}" title="${p.edited ? 'Category set by you' : p.fromMenu ? 'From the Banquet Menu or the package-only wines' : 'Guessed from the name: not on a linked Banquet Menu'}">${O().CATS.map(([v, n]) => `<option value="${v}" ${v === p.cat ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${!p.fromMenu && !p.edited && p.cat !== 'none' ? ' <span class="ord-guess" title="Not on a linked Banquet Menu: category guessed from the name">?</span>' : ''}`;
 
   function eventHtml(x) {
     const groups = {};
