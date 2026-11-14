@@ -53,11 +53,13 @@
   /** A product's category for ordering: from the Banquet Menu when it's on one, else from its name. */
   function categorise(name, menuItems) {
     const M = global.CrownMenu;
-    const n = String(name).toLowerCase();
     const m = M && menuItems && menuItems.length ? M.bestMatch(name, menuItems) : null;
+    // The BEO's name plus the menu's name for it ("James Squire Orchard Crush Apple" is "… Apple Cider" on the menu).
+    const n = `${name} ${m ? m.name : ''}`.toLowerCase();
     const cat = m ? m.cat : M ? M.guessCat(name) : 'Other';
-    const beerish = cat === 'Beer & cider' || /beer|lager|ale\b|pilsner|cider|seltzer/.test(n);
-    const light = /\blight\b|\bmid\b|mid[- ]?strength|3\.5|\bzero\b|0\.0|non[\s-]?alc|alcohol[\s-]?free|cider/.test(n);
+    const cider = /cider|orchard crush|somersby|strongbow|5 seeds|rekorderlig|kopparberg|monteith|pear\b|apple\b/.test(n);
+    const beerish = cat === 'Beer & cider' || cider || /beer|lager|ale\b|pilsner|seltzer/.test(n);
+    const light = cider || /\blight\b|\bmid\b|mid[- ]?strength|3\.5|\bzero\b|0\.0|non[\s-]?alc|alcohol[\s-]?free/.test(n);
     let c;
     if (cat === 'Soft drinks & juice' || /soft drinks?|juice|soda water|mineral water|sparkling water/.test(n)) c = 'none';
     else if (beerish && light) c = 'light';

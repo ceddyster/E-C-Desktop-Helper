@@ -29,7 +29,7 @@
         continue;
       }
       if (!inOn) continue;
-      if (/^\d*\s*@|beverage notes|corkage|supplied by/i.test(t)) { inOn = false; continue; }
+      if (/^\d*\s*@|^\d+\s*(\(.*?\)\s*)?guests?\b|beverage notes|corkage|supplied by/i.test(t)) { inOn = false; continue; }
       const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/);
       if (!m) continue;
       if (/assorted soft drinks?/i.test(m[1])) SOFTS.forEach(add);
@@ -53,9 +53,12 @@
       // "Beverages on consumption", "VIP Tables Spirits on Consumption", "Heineken Zero - Consumption"…
       // (headings, not "> notes"). Soft drinks on consumption aren't ordered here.
       if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? '' : 'on'; continue; }
-      if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) { mode = 'pkg'; out.packages.push(t); continue; }
+      if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) {
+        if (/soft drinks?/i.test(t)) { mode = ''; continue; }        // soft drink packages aren't ordered here
+        mode = 'pkg'; out.packages.push(t); continue;
+      }
       if (!mode) continue;
-      if (/^\d*\s*@|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
+      if (/^\d*\s*@|^\d+\s*(\(.*?\)\s*)?guests?\b|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
       if (/^(please note|the final amount|note:|\*)/i.test(t) || /\bguests?\s*@|per person\b.*\btotal|event spend/i.test(t)) continue;
       if (mode === 'on') { const m = t.match(/^>?\s*(.+?)\s*@\s*\$[\d,.]+/); if (m) add(m[1]); continue; }
       // Package products: one per line, perhaps with "> " in front or a price after.

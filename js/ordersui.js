@@ -54,6 +54,7 @@
           const c = O().categorise(name, menu);
           return { name, cat: edited || c.cat, fromMenu: c.fromMenu, edited: !!edited };
         });
+        if (products.every((p) => p.cat === 'none')) continue;     // e.g. soft drinks only: nothing to order
         const type = ch.type || O().guessType(e);
         const guests = ch.guests != null && ch.guests !== '' ? +ch.guests : +e.pax || 0;
         const r = O().compute({ type, guests, products, primary: ch.primary || {}, params: getParams() });
