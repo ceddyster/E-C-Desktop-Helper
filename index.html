@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Crown Work Dashboard</title>
-  <link rel="stylesheet" href="styles.css?v=2026-11-25e">
+  <link rel="stylesheet" href="styles.css?v=2026-11-25f">
 </head>
 <body>
   <header class="topbar">
@@ -366,6 +366,15 @@
         </select>
       </label>
       <p class="muted small" id="consKeepNote"></p>
+      <fieldset class="backup-box">
+        <legend>Back up / restore</legend>
+        <p class="muted small">Saves everything the dashboard keeps in this browser (documents read, settings, hidden events and people, sheets, order choices and bar consumption) to a file, and puts it back. Use it before clearing this site's data in the browser, or to move to another computer. Linked folders can't be backed up: link them again afterwards.</p>
+        <div class="row">
+          <button class="btn sm" type="button" id="btnBackup">⬇ Back up to a file</button>
+          <button class="btn sm" type="button" id="btnRestore">⬆ Restore from a file</button>
+          <input type="file" id="restoreInput" accept=".json,application/json" hidden>
+        </div>
+      </fieldset>
       <div class="dlg-foot">
         <button class="btn primary" value="save" id="btnSaveSettings">Save</button>
       </div>
@@ -393,25 +402,25 @@
       window.__crownShowError = show;
     })();
   </script>
-  <script src="vendor/xlsx.full.min.js?v=2026-11-25e"></script>
-  <script src="config.js?v=2026-11-25e"></script>
-  <script src="js/slimzip.js?v=2026-11-25e"></script>
-  <script src="js/parse.js?v=2026-11-25e"></script>
-  <script src="js/xlsxfmt.js?v=2026-11-25e"></script>
-  <script src="js/tl.js?v=2026-11-25e"></script>
-  <script src="js/beo.js?v=2026-11-25e"></script>
-  <script src="js/beobev.js?v=2026-11-25e"></script>
-  <script src="js/folder.js?v=2026-11-25e"></script>
-  <script src="js/match.js?v=2026-11-25e"></script>
-  <script src="js/consumption.js?v=2026-11-25e"></script>
-  <script src="js/consui.js?v=2026-11-25e"></script>
-  <script src="js/mgr.js?v=2026-11-25e"></script>
-  <script src="js/mgrui.js?v=2026-11-25e"></script>
-  <script src="js/menu.js?v=2026-11-25e"></script>
-  <script src="js/orders.js?v=2026-11-25e"></script>
-  <script src="js/ordersui.js?v=2026-11-25e"></script>
-  <script src="js/onconui.js?v=2026-11-25e"></script>
-  <script src="js/drive.js?v=2026-11-25e"></script>
-  <script src="js/app.js?v=2026-11-25e"></script>
+  <script src="vendor/xlsx.full.min.js?v=2026-11-25f"></script>
+  <script src="config.js?v=2026-11-25f"></script>
+  <script src="js/slimzip.js?v=2026-11-25f"></script>
+  <script src="js/parse.js?v=2026-11-25f"></script>
+  <script src="js/xlsxfmt.js?v=2026-11-25f"></script>
+  <script src="js/tl.js?v=2026-11-25f"></script>
+  <script src="js/beo.js?v=2026-11-25f"></script>
+  <script src="js/beobev.js?v=2026-11-25f"></script>
+  <script src="js/folder.js?v=2026-11-25f"></script>
+  <script src="js/match.js?v=2026-11-25f"></script>
+  <script src="js/consumption.js?v=2026-11-25f"></script>
+  <script src="js/consui.js?v=2026-11-25f"></script>
+  <script src="js/mgr.js?v=2026-11-25f"></script>
+  <script src="js/mgrui.js?v=2026-11-25f"></script>
+  <script src="js/menu.js?v=2026-11-25f"></script>
+  <script src="js/orders.js?v=2026-11-25f"></script>
+  <script src="js/ordersui.js?v=2026-11-25f"></script>
+  <script src="js/onconui.js?v=2026-11-25f"></script>
+  <script src="js/drive.js?v=2026-11-25f"></script>
+  <script src="js/app.js?v=2026-11-25f"></script>
 </body>
 </html>

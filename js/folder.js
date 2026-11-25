@@ -62,6 +62,11 @@
       return `${mb(e.usage)} MB used of ${mb(e.quota)} MB (${Math.round((e.usage / e.quota) * 100)}%)`;
     } catch (_) { return ''; }
   }
+  /** Can the browser save at all for this site? Saves and removes a small plain value. */
+  async function writeTest() {
+    try { await tx('readwrite', (st) => st.put({ at: Date.now() }, '__test')); await tx('readwrite', (st) => st.delete('__test')); return 'the browser can save plain data here, so only saving folder links is failing.'; }
+    catch (e) { return `the browser can't save anything here (${errText(e)}).`; }
+  }
   /** Starts the store again from empty (the folders then need linking again). */
   async function reset() {
     try { if (dbOpen) dbOpen.close(); } catch (_) {}
@@ -228,5 +233,5 @@
   async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove, reset, within, usage, get lastError() { return lastError; }, get storeName() { return dbName; } };
+    savedAll, choose, add, remove, reset, within, usage, writeTest, get lastError() { return lastError; }, get storeName() { return dbName; } };
 })(window);

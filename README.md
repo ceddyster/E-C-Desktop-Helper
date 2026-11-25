@@ -15,6 +15,12 @@ The main page is a one-page summary made of small windows. Click a window to ope
 
 It's plain HTML/CSS/JS with no build step and no server. All data stays in your browser (localStorage). Nothing is uploaded anywhere.
 
+## Back up / restore
+
+⚙︎ Settings → **Back up to a file** saves everything the dashboard keeps in this browser (documents read, settings, hidden events and people, on-consumption sheets, order choices and bar consumption) to a `.json` file. **Restore from a file** puts it back (replacing what's there) and reloads. Use it before clearing this site's data in the browser, or to move to another computer. Linked folders can't be backed up: link them again afterwards.
+
+If Documents shows *"The browser couldn't save to its storage for this site (Failed to write blobs)"*, the browser's own storage for this site is damaged. Close Edge completely (including in the system tray) and reopen it. If that doesn't fix it: back up, clear this site's data (Edge: Settings → Cookies and site permissions → Manage and delete cookies and site data → See all cookies and site data → search *ceddyster.github.io* → delete), reload, restore the backup and link the folders again.
+
 ## Getting your documents in
 
 Click **📂 Load documents** (or drag files onto the page) and choose files from your **G: drive**. Google Drive for Desktop shows up as a normal drive, so you don't need any Google setup.

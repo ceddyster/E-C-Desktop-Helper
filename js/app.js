@@ -689,6 +689,7 @@
     const items = (await F.savedAll()) || [];
     flog(`${items.length} linked folder${items.length === 1 ? '' : 's'} found${F.lastError ? ` (${F.lastError})` : ''}.`);
     F.usage().then((u) => { if (u) flog(`Browser storage for this site: ${u}.`); });
+    F.writeTest().then((r) => flog(`Storage test: ${r}`));
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
@@ -1065,6 +1066,9 @@
 
     $('btnSources').onclick = () => { renderSources(); $('sourcesDlg').showModal(); };
     $('sourceList').onclick = (e) => { const b = e.target.closest('[data-remove]'); if (b) removeSource(b.dataset.remove); };
+    $('btnBackup').onclick = () => backup().catch((e) => toast(`Couldn't back up: ${e.message || e}`));
+    $('btnRestore').onclick = () => { $('restoreInput').value = ''; $('restoreInput').click(); };
+    $('restoreInput').onchange = (e) => { const f = e.target.files[0]; if (f) restore(f); };
     $('btnClear').onclick = () => {
       if (!confirm('Remove all loaded documents from this dashboard?')) return;
       state.sources = []; state.events = []; state.shifts = [];
@@ -1207,6 +1211,36 @@
       if (pruneCons()) save();
     });
   }
+  /* ---------- Back up / restore ---------- */
+  // Everything kept in this browser: every 'crownDash…' localStorage entry, plus the bar consumption days.
+  async function backup() {
+    const ls = {};
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^crownDash/.test(k)) ls[k] = localStorage.getItem(k); }
+    let cons = {};
+    try { cons = await window.CrownCons.all(); } catch (e) { toast(`Bar consumption couldn't be included (${e.message || e}); it can be read again from its folder.`); }
+    const data = { app: 'crown-work-dashboard', version: 1, savedAt: new Date().toISOString(), localStorage: ls, consDays: cons };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+    a.download = `Crown dashboard backup ${P.isoOf(new Date())}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast(`Backed up ${state.sources.length} documents and ${Object.keys(cons).length} days of bar consumption.`);
+  }
+  async function restore(file) {
+    let data;
+    try { data = JSON.parse(await file.text()); } catch (_) { toast('That file isn\'t a dashboard backup.'); return; }
+    if (!data || data.app !== 'crown-work-dashboard' || !data.localStorage) { toast('That file isn\'t a dashboard backup.'); return; }
+    if (!confirm(`Restore the backup from ${new Date(data.savedAt).toLocaleString('en-AU')}? It replaces what the dashboard has in this browser now.`)) return;
+    try {
+      for (const k of Object.keys(localStorage).filter((k) => /^crownDash/.test(k))) localStorage.removeItem(k);
+      for (const [k, v] of Object.entries(data.localStorage)) localStorage.setItem(k, v);
+    } catch (e) { toast(`Couldn't restore: the browser wouldn't save (${e.message || e}).`); return; }
+    let n = 0, failed = 0;
+    for (const [k, day] of Object.entries(data.consDays || {})) { try { await window.CrownCons.put(k, day); n++; } catch (_) { failed++; } }
+    alert(`Restored.${failed ? ` ${failed} days of bar consumption couldn't be saved; they'll be read again from the folder.` : ''} The page will now reload. Link your folders again in Documents.`);
+    location.reload();
+  }
+
   window.__crownInitFolder = initFolder;   // test hook: re-load the linked folders
   // Test hook: lets automated tests link a folder handle without the native picker.
   window.__crownTestLinkFolder = async (h) => {
