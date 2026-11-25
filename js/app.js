@@ -106,7 +106,12 @@
 
   let toastTimer;
   function toast(msg) {
-    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    const t = $('toast');
+    // Inside an open popup, so it isn't hidden behind it.
+    const dlg = document.querySelector('dialog[open]');
+    const home = dlg || document.body;
+    if (t.parentElement !== home) home.appendChild(t);
+    t.textContent = msg; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
   }
 
@@ -680,7 +685,9 @@
   async function initFolder() {
     if (!F || !F.supported) return;
     $('btnFolder').hidden = false;
+    flog('Loading linked folders…');
     const items = (await F.savedAll()) || [];
+    flog(`${items.length} linked folder${items.length === 1 ? '' : 's'} found${F.lastError ? ` (${F.lastError})` : ''}.`);
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
@@ -696,26 +703,46 @@
     scanAll(false);
   }
 
+  // A short record of what linking did, shown in Documents, so a problem can be pinned down.
+  const folderLog = [];
+  function flog(msg) {
+    folderLog.push(`${new Date().toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}  ${msg}`);
+    if (folderLog.length > 20) folderLog.shift();
+    console.log('[folders]', msg);
+    const el = $('folderLog'); if (el) el.textContent = folderLog.join('\n');
+  }
+
   async function linkFolder(replaceId) {
-    if (!F || !F.supported) { toast('Linking a folder needs Microsoft Edge or Google Chrome.'); return; }
+    flog('Link folder clicked.');
+    if (!F || !F.supported) { flog('This browser can\'t link folders.'); toast('Linking a folder needs Microsoft Edge or Google Chrome.'); return; }
     let handle;
-    try { handle = await F.choose(); } catch (e) { if (e.name !== 'AbortError') toast('Couldn\'t link that folder: ' + e.message); return; }
+    try { handle = await F.choose(); } catch (e) {
+      flog(`Folder picker closed without a folder (${e.name}: ${e.message}).`);
+      if (e.name !== 'AbortError') toast('Couldn\'t link that folder: ' + e.message);
+      else toast('📁 No folder was linked. If you did choose one, the browser may not allow that folder (e.g. a whole drive, or your user folder). Try the folder inside it.');
+      renderFolder(); return;
+    }
+    flog(`Folder chosen: "${handle.name}". Saving it…`);
     // The same folder linked again after the browser lost it: carry on from what was already read.
     const again = !replaceId && Object.entries(state.folders || {}).find(([fid, st]) => st.name === handle.name && !folders.some((f) => f.id === fid));
     if (again) replaceId = again[0];
     let id, existed = false;
-    try { ({ id, existed } = await F.add(handle, replaceId)); } catch (e) {
+    try { ({ id, existed } = await F.add(handle, replaceId)); flog(existed ? 'The browser already had this folder saved.' : `Saved (${F.storeName}).`); } catch (e) {
       // The browser wouldn't remember it: still use it now, and say so.
+      flog(`Couldn't save it: ${e.message || e}. Using it for now anyway.`);
       id = replaceId || 'f' + Date.now().toString(36);
       toast(`📁 ${handle.name} is linked for now, but the browser couldn't remember it (${e.message || e}), so it will need linking again after a reload. See Documents.`);
     }
-    if (existed) { toast(`📁 ${handle.name} is already linked.`); return; }
+    // Already saved by the browser: if it's showing here too, there's nothing to do; if not, show it now.
+    if (existed && folders.some((f) => f.id === id)) { toast(`📁 ${handle.name} is already linked.`); renderFolder(); return; }
     folders = folders.filter((f) => f.id !== id).concat({ id, handle, perm: 'granted' });
     state.folders = state.folders || {};
     if (again && state.folders[id]) state.folders[id].name = handle.name;
     else state.folders[id] = { name: handle.name, seen: {}, files: {}, readerVersion: READER_VERSION };
     save(); renderFolder();
+    flog(`Linked "${handle.name}". Checking its files…`);
     await scanAll(true, id);
+    flog('Check finished.');
   }
 
   async function reconnectFolders() {
@@ -936,6 +963,7 @@
           <button class="btn primary sm" type="button" data-folder="link">📁 ${folders.length ? 'Link another folder' : 'Link folder'}</button>
           ${folders.length ? '<button class="btn sm" type="button" data-folder="scan">Check all now</button>' : ''}
         </div>
+        <details class="folder-log" ${folders.length ? "" : "open"}><summary>Linking log</summary><pre id="folderLog">${esc(folderLog.join('\n'))}</pre></details>
         ${folders.length ? `<p class="muted small">All linked folders are checked when the dashboard opens and on the hour, every hour, while it's open${nextCheckAt ? ` (next check ${nextCheckAt.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })})` : ''}. Use <b>Check all now</b> to check straight away.</p>` : ''}
       </div>`;
   }

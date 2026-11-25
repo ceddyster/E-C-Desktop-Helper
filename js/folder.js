@@ -210,5 +210,5 @@
   async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove, reset, get lastError() { return lastError; } };
+    savedAll, choose, add, remove, reset, get lastError() { return lastError; }, get storeName() { return dbName; } };
 })(window);
