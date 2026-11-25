@@ -10,8 +10,15 @@
 
   // The browser's store for folder handles. If it can't be opened (damaged, or missing its table), it's
   // repaired; failing that, a fresh store is used. The last problem is kept in lastError for Documents.
-  let lastError = null, dbName = DB, dbPromise = null;
+  // Which store to use: normally 'crownDash'; 'crownDashFolders' once the first has stopped working.
+  const PICK = 'crownDash.folderStore';
+  let dbName = DB;
+  try { dbName = localStorage.getItem(PICK) || DB; } catch (_) {}
+  const useStore = (name) => { dbName = name; try { if (name === DB) localStorage.removeItem(PICK); else localStorage.setItem(PICK, name); } catch (_) {} };
+  let lastError = null, dbPromise = null, dbOpen = null;
   const errText = (e) => (e && (e.message || e.name)) || String(e);
+  // The browser can stop answering (a stuck or damaged store): give up after a few seconds rather than wait forever.
+  const within = (p, ms, what) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(what)), ms))]);
   function openDb(name, version) {
     return new Promise((res, rej) => {
       const r = version ? indexedDB.open(name, version) : indexedDB.open(name);
@@ -30,28 +37,43 @@
   const dropDb = (name) => new Promise((res) => { const r = indexedDB.deleteDatabase(name); r.onsuccess = r.onerror = r.onblocked = () => res(); });
   function idb() {
     if (!dbPromise) {
-      dbPromise = (async () => {
-        try { return await openDb(dbName); } catch (e) {
-          lastError = `Couldn't open the browser's store of linked folders (${errText(e)}).`;
-          console.warn(lastError);
-          try { await dropDb(dbName); return await openDb(dbName); } catch (_) {}
-          dbName = DB + 'Folders';
-          return openDb(dbName);
-        }
-      })();
-      dbPromise.catch(() => { dbPromise = null; });
+      dbPromise = within(open0(), 6000, 'the browser didn\'t answer when the dashboard opened its list of linked folders');
+      dbPromise.then((db) => { dbOpen = db; }, (e) => {
+        lastError = `Couldn't open the browser's store of linked folders (${errText(e)}).`; console.warn(lastError); dbPromise = null;
+        if (dbName === DB) useStore(DB + 'Folders');      // next time, use a fresh store
+      });
     }
     return dbPromise;
   }
+  async function open0() {
+    try { return await openDb(dbName); } catch (e) {
+      lastError = `Couldn't open the browser's store of linked folders (${errText(e)}).`;
+      console.warn(lastError);
+      try { await dropDb(dbName); return await openDb(dbName); } catch (_) {}
+      useStore(DB + 'Folders');
+      return openDb(dbName);
+    }
+  }
+  /** Starts the store again from empty (the folders then need linking again). */
+  async function reset() {
+    try { if (dbOpen) dbOpen.close(); } catch (_) {}
+    dbOpen = null; dbPromise = null;
+    await within(Promise.all([dropDb(DB), dropDb(DB + 'Folders')]), 6000, 'the browser didn\'t answer').catch((e) => { lastError = `Couldn't reset the store of linked folders (${errText(e)}). Close every dashboard tab, then open it again.`; throw new Error(lastError); });
+    useStore(DB); lastError = null;
+  }
   async function tx(mode, fn) {
     const db = await idb();
-    return new Promise((res, rej) => {
+    return within(new Promise((res, rej) => {
       let t;
       try { t = db.transaction(STORE, mode); } catch (e) { dbPromise = null; return rej(e); }
       const req = fn(t.objectStore(STORE));
       t.oncomplete = () => res(req && req.result);
       t.onerror = () => rej(t.error);
       t.onabort = () => rej(t.error || new Error('the browser stopped saving'));
+    }), 6000, 'the browser didn\'t answer when asked for the linked folders').catch((e) => {
+      lastError = lastError || `The browser's store of linked folders isn't working (${errText(e)}).`; dbPromise = null;
+      if (dbName === DB) useStore(DB + 'Folders');
+      throw e;
     });
   }
 
@@ -174,7 +196,8 @@
   /** Adds a folder (or replaces `replaceId`). Returns { id, existed }. */
   async function add(handle, replaceId) {
     // If the saved list can't be read, don't overwrite it with just this folder.
-    const items = await savedAll();
+    let items = await savedAll();
+    if (items == null && dbName !== DB) items = await savedAll();   // the usual store failed: try the fresh one
     if (items == null) throw new Error(lastError || 'couldn\'t read the linked folders');
     for (const it of items) {
       try { if (it.id !== replaceId && await it.handle.isSameEntry(handle)) return { id: it.id, existed: true }; } catch (_) {}
@@ -187,5 +210,5 @@
   async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove, get lastError() { return lastError; } };
+    savedAll, choose, add, remove, reset, get lastError() { return lastError; } };
 })(window);

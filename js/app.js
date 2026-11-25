@@ -684,12 +684,14 @@
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
-    folders = [];
+    // Keep any folder linked while the list was loading (or linked for this session only).
+    const loaded = [];
     for (const it of items) {
       let perm = 'prompt';
       try { perm = await F.permission(it.handle, false); } catch (_) {}
-      folders.push({ id: it.id, handle: it.handle, perm });
+      loaded.push({ id: it.id, handle: it.handle, perm });
     }
+    folders = [...loaded, ...folders.filter((f) => !loaded.some((x) => x.id === f.id))];
     save(); renderFolder();
     scanAll(false);
   }
@@ -924,7 +926,8 @@
     const problem = F && F.lastError;
     panel.innerHTML = `${problem || lost.length ? `<div class="rev-alert">${problem ? `<strong>⚠ ${esc(problem)}</strong>` : ''}
         ${lost.length ? `<p>Previously linked here: <b>${lost.map(esc).join('</b>, <b>')}</b>. Link ${lost.length === 1 ? 'it' : 'them'} again with <b>📁 Link ${folders.length ? 'another ' : ''}folder</b>; files already read won't be read twice unless they've changed.</p>` : ''}
-        ${problem ? '<p class="muted small">If linking keeps failing, close every other tab with the dashboard open and reload this one. Edge or Chrome may also need site data allowed for this site (Settings › Cookies and site permissions).</p>' : ''}</div>` : ''}
+        ${problem ? `<p class="muted small">The dashboard has switched to a fresh store, so link your folders again and they'll be remembered. If linking still doesn't stick: close every other tab with the dashboard open, click <b>Reset the folder store</b> and link the folders again (your documents and data aren't touched). If that doesn't help, Edge or Chrome may need site data allowed for this site (Settings › Cookies and site permissions).</p>
+        <button class="btn sm" type="button" data-folder="resetstore">Reset the folder store</button>` : ''}</div>` : ''}
       ${boxes.join('')}
       <div class="folder-box ${folders.length ? 'add-box' : ''}">
         ${folders.length ? '' : `<strong>No folder linked</strong>
@@ -998,7 +1001,11 @@
       const a = e.target.closest('[data-folder]'); if (!a) return;
       const id = a.dataset.id;
       ({ link: () => linkFolder().catch((e) => toast(`📁 Couldn't link that folder: ${e.message || e}`)), change: () => linkFolder(id).catch((e) => toast(`📁 Couldn't change that folder: ${e.message || e}`)), scan: () => scanAll(true), reread: () => rereadFolder(id),
-        reconnect: reconnectFolders, unlink: () => unlinkFolder(id) })[a.dataset.folder]();
+        reconnect: reconnectFolders, unlink: () => unlinkFolder(id),
+        resetstore: async () => {
+          try { await F.reset(); toast('📁 Folder store reset. Link your folders again.'); await initFolder(); }
+          catch (e) { toast(`📁 ${e.message || e}`); renderFolder(); }
+        } })[a.dataset.folder]();
     };
     // Linked folders are checked when the dashboard opens (initFolder) and then on the hour, every hour,
     // while it's open (3:00, 4:00…). "Check all now" in Documents checks straight away.
