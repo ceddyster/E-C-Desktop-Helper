@@ -688,6 +688,7 @@
     flog('Loading linked folders…');
     const items = (await F.savedAll()) || [];
     flog(`${items.length} linked folder${items.length === 1 ? '' : 's'} found${F.lastError ? ` (${F.lastError})` : ''}.`);
+    F.usage().then((u) => { if (u) flog(`Browser storage for this site: ${u}.`); });
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
@@ -746,12 +747,13 @@
     flog('Check finished.');
   }
 
-  async function reconnectFolders() {
-    for (const f of needsOk()) {
+  // The browser allows one permission request per click, so a folder's own button asks for just that folder.
+  async function reconnectFolders(onlyId) {
+    for (const f of needsOk().filter((x) => !onlyId || x.id === onlyId).slice(0, onlyId ? 1 : 1)) {
       try { f.perm = await F.permission(f.handle, true); flog(`"${fname(f)}": ${f.perm === 'granted' ? 'allowed' : 'not allowed'}.`); } catch (e) { f.perm = 'denied'; flog(`"${fname(f)}": ${e.message || e}.`); }
     }
     renderFolder();
-    if (needsOk().length) toast('The browser didn\'t allow access to every folder.');
+    if (needsOk().length) toast(`📁 ${needsOk().length} folder${needsOk().length === 1 ? ' still needs' : 's still need'} your OK: click Reconnect on ${needsOk().length === 1 ? 'it' : 'each one'}.`);
     scanAll(true);
   }
 
@@ -931,7 +933,7 @@
           ? (scanningId === f.id ? `Checking files ${scanProgress}…` : `Checked ${st.lastScan ? new Date(st.lastScan).toLocaleString('en-AU', { dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}${st.found != null ? ` · ${st.found} files found` : ''}`)
           : 'The browser needs your OK again before it can read this folder.'}</p>
         <div class="row">
-          ${ok ? `<button class="btn sm" type="button" data-folder="reread" data-id="${f.id}">Re-read all</button>` : `<button class="btn primary sm" type="button" data-folder="reconnect">Reconnect</button>`}
+          ${ok ? `<button class="btn sm" type="button" data-folder="reread" data-id="${f.id}">Re-read all</button>` : `<button class="btn primary sm" type="button" data-folder="reconnect" data-id="${f.id}">Reconnect</button>`}
           <button class="btn sm" type="button" data-folder="change" data-id="${f.id}">Change folder</button>
           <button class="btn sm danger" type="button" data-folder="unlink" data-id="${f.id}">Unlink</button>
         </div>
@@ -955,8 +957,10 @@
     const problem = F && F.lastError;
     panel.innerHTML = `${problem || lost.length ? `<div class="rev-alert">${problem ? `<strong>⚠ ${esc(problem)}</strong>` : ''}
         ${lost.length ? `<p>Previously linked here: <b>${lost.map(esc).join('</b>, <b>')}</b>. Link ${lost.length === 1 ? 'it' : 'them'} again with <b>📁 Link ${folders.length ? 'another ' : ''}folder</b>; files already read won't be read twice unless they've changed.</p>` : ''}
-        ${problem ? `<p class="muted small">The dashboard has switched to a fresh store, so link your folders again and they'll be remembered. If linking still doesn't stick: close every other tab with the dashboard open, click <b>Reset the folder store</b> and link the folders again (your documents and data aren't touched). If that doesn't help, Edge or Chrome may need site data allowed for this site (Settings › Cookies and site permissions).</p>
-        <button class="btn sm" type="button" data-folder="resetstore">Reset the folder store</button>` : ''}</div>` : ''}
+        ${problem ? (/couldn't save/i.test(problem)
+          ? `<p class="muted small">Your linked folders still work: click <b>Reconnect</b> on each one to let the browser read it again. Linking a new folder works until the page is reloaded, but won't be remembered until the browser can save again. Common causes: the computer's C: drive is nearly full, or security software on this PC is blocking the browser's storage. See the Linking log for how much storage this site uses.</p>`
+          : `<p class="muted small">Link your folders again and they'll be remembered. If that doesn't stick: close every other tab with the dashboard open, click <b>Reset the folder store</b> and link the folders again (your documents and data aren't touched).</p>
+        <button class="btn sm" type="button" data-folder="resetstore">Reset the folder store</button>`) : ''}</div>` : ''}
       ${boxes.join('')}
       <div class="folder-box ${folders.length ? 'add-box' : ''}">
         ${folders.length ? '' : `<strong>No folder linked</strong>
@@ -1031,7 +1035,7 @@
       const a = e.target.closest('[data-folder]'); if (!a) return;
       const id = a.dataset.id;
       ({ link: () => linkFolder().catch((e) => toast(`📁 Couldn't link that folder: ${e.message || e}`)), change: () => linkFolder(id).catch((e) => toast(`📁 Couldn't change that folder: ${e.message || e}`)), scan: () => scanAll(true), reread: () => rereadFolder(id),
-        reconnect: reconnectFolders, unlink: () => unlinkFolder(id),
+        reconnect: () => reconnectFolders(id), unlink: () => unlinkFolder(id),
         resetstore: async () => {
           try { await F.reset(); toast('📁 Folder store reset. Link your folders again.'); await initFolder(); }
           catch (e) { toast(`📁 ${e.message || e}`); renderFolder(); }

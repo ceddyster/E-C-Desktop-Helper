@@ -54,6 +54,14 @@
       return openDb(dbName);
     }
   }
+  /** "123 MB used of 2,000 MB" for this site's browser storage, or '' if the browser won't say. */
+  async function usage() {
+    try {
+      const e = await within(navigator.storage.estimate(), 3000, 'no answer');
+      const mb = (b) => Math.round(b / 1048576).toLocaleString('en-AU');
+      return `${mb(e.usage)} MB used of ${mb(e.quota)} MB (${Math.round((e.usage / e.quota) * 100)}%)`;
+    } catch (_) { return ''; }
+  }
   /** Starts the store again from empty (the folders then need linking again). */
   async function reset() {
     try { if (dbOpen) dbOpen.close(); } catch (_) {}
@@ -71,8 +79,10 @@
       t.onerror = () => rej(t.error);
       t.onabort = () => rej(t.error || new Error('the browser stopped saving'));
     }), 6000, 'the browser didn\'t answer when asked for the linked folders').catch((e) => {
-      lastError = lastError || `The browser's store of linked folders isn't working (${errText(e)}).`; dbPromise = null;
-      if (dbName === DB) useStore(DB + 'Folders');
+      lastError = lastError || (/blob|quota|space|disk/i.test(errText(e))
+        ? `The browser couldn't save to its storage for this site (${errText(e)}). Its storage may be full, or blocked on this computer.`
+        : `The browser's store of linked folders isn't working (${errText(e)}).`);
+      dbPromise = null;
       throw e;
     });
   }
@@ -183,6 +193,12 @@
   async function savedAll() {
     let items = null;
     try { items = await tx('readonly', (st) => st.get(LIST)); } catch (e) { lastError = `Couldn't read the linked folders (${errText(e)}).`; console.warn(lastError); return null; }
+    if ((!items || !items.length) && dbName !== DB) {
+      // The fresh store is empty: the folders may still be in the usual one.
+      const was = dbName; useStore(DB); try { if (dbOpen) dbOpen.close(); } catch (_) {} dbOpen = null; dbPromise = null;
+      try { const old = await tx('readonly', (st) => st.get(LIST)); if (old && old.length) return old; } catch (_) {}
+      useStore(was); try { if (dbOpen) dbOpen.close(); } catch (_) {} dbOpen = null; dbPromise = null;
+    }
     if (!items || !items.length) {
       const old = await saved();
       items = old ? [{ id: 'f1', handle: old }] : (items || []);
@@ -212,5 +228,5 @@
   async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove, reset, within, get lastError() { return lastError; }, get storeName() { return dbName; } };
+    savedAll, choose, add, remove, reset, within, usage, get lastError() { return lastError; }, get storeName() { return dbName; } };
 })(window);
