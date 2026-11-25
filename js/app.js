@@ -691,14 +691,15 @@
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
-    // Keep any folder linked while the list was loading (or linked for this session only).
-    const loaded = [];
-    for (const it of items) {
-      let perm = 'prompt';
-      try { perm = await F.permission(it.handle, false); } catch (_) {}
-      loaded.push({ id: it.id, handle: it.handle, perm });
-    }
+    // Show the folders straight away, then ask the browser about each one (all at once, each with a
+    // time limit, so one it has lost track of can't hold up the rest). Keep any folder linked meanwhile.
+    const loaded = items.map((it) => ({ id: it.id, handle: it.handle, perm: 'prompt' }));
     folders = [...loaded, ...folders.filter((f) => !loaded.some((x) => x.id === f.id))];
+    renderFolder();
+    await Promise.all(loaded.map(async (f) => {
+      try { f.perm = await F.permission(f.handle, false); flog(`"${fname(f)}": ${f.perm === 'granted' ? 'ready' : 'needs your OK (Reconnect)'}.`); }
+      catch (e) { f.perm = 'prompt'; flog(`"${fname(f)}": ${e.message || e} — click Reconnect, or Change folder to pick it again.`); }
+    }));
     save(); renderFolder();
     scanAll(false);
   }
@@ -747,7 +748,7 @@
 
   async function reconnectFolders() {
     for (const f of needsOk()) {
-      try { f.perm = await F.permission(f.handle, true); } catch (_) { f.perm = 'denied'; }
+      try { f.perm = await F.permission(f.handle, true); flog(`"${fname(f)}": ${f.perm === 'granted' ? 'allowed' : 'not allowed'}.`); } catch (e) { f.perm = 'denied'; flog(`"${fname(f)}": ${e.message || e}.`); }
     }
     renderFolder();
     if (needsOk().length) toast('The browser didn\'t allow access to every folder.');
@@ -800,7 +801,8 @@
       // (with the default setting, 1 July of last financial year).
       const keepFrom = consCutoff(state.consKeep);
       const keepFromMs = keepFrom ? parseISO(keepFrom).getTime() : 0;
-      const files = await F.list(f.handle, '', 0, [], { before: keepFrom });
+      // A folder the browser can no longer reach can stop answering: give up on it after a few minutes.
+      const files = await F.within(F.list(f.handle, '', 0, [], { before: keepFrom }), 180000, `"${fname(f)}" didn't respond. If it's a OneDrive/SharePoint folder, check it's syncing, or use Change folder to pick it again`);
       st.skippedDirs = files.skippedDirs || [];
       const present = new Set(files.map((x) => x.path));
       for (const k of Object.keys(st.files)) if (!present.has(k)) delete st.files[k];
@@ -1201,6 +1203,7 @@
       if (pruneCons()) save();
     });
   }
+  window.__crownInitFolder = initFolder;   // test hook: re-load the linked folders
   // Test hook: lets automated tests link a folder handle without the native picker.
   window.__crownTestLinkFolder = async (h) => {
     const id = 't' + folders.length; folders.push({ id, handle: h, perm: 'granted' });

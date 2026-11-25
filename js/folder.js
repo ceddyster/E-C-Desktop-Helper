@@ -89,10 +89,12 @@
   async function forget() { try { await tx('readwrite', (s) => s.delete(KEY)); } catch (_) {} }
 
   /** 'granted' | 'prompt' | 'denied'. Asking needs a click from the user. */
+  // A folder the browser has lost track of (e.g. a OneDrive folder that has moved) can leave these
+  // questions unanswered, so each has a time limit.
   async function permission(h, ask) {
     if (!h.queryPermission) return 'granted';
-    let p = await h.queryPermission({ mode: 'read' });
-    if (p !== 'granted' && ask) p = await h.requestPermission({ mode: 'read' });
+    let p = await within(h.queryPermission({ mode: 'read' }), 4000, 'the browser didn\'t answer about this folder');
+    if (p !== 'granted' && ask) p = await within(h.requestPermission({ mode: 'read' }), 120000, 'no answer to the permission request');
     return p;
   }
 
@@ -200,7 +202,7 @@
     if (items == null && dbName !== DB) items = await savedAll();   // the usual store failed: try the fresh one
     if (items == null) throw new Error(lastError || 'couldn\'t read the linked folders');
     for (const it of items) {
-      try { if (it.id !== replaceId && await it.handle.isSameEntry(handle)) return { id: it.id, existed: true }; } catch (_) {}
+      try { if (it.id !== replaceId && await within(it.handle.isSameEntry(handle), 3000, 'no answer')) return { id: it.id, existed: true }; } catch (_) {}
     }
     const id = replaceId || 'f' + Date.now().toString(36);
     const next = replaceId && items.some((it) => it.id === replaceId) ? items.map((it) => (it.id === replaceId ? { id, handle } : it)) : [...items, { id, handle }];
@@ -210,5 +212,5 @@
   async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove, reset, get lastError() { return lastError; }, get storeName() { return dbName; } };
+    savedAll, choose, add, remove, reset, within, get lastError() { return lastError; }, get storeName() { return dbName; } };
 })(window);
