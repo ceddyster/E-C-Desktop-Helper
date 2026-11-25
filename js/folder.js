@@ -8,21 +8,50 @@
   const WANT = /\.(xlsx|xlsm|xlsb|xls|pdf|ics|url)$/i;
   const MAX_DEPTH = 6;
 
-  function idb() {
+  // The browser's store for folder handles. If it can't be opened (damaged, or missing its table), it's
+  // repaired; failing that, a fresh store is used. The last problem is kept in lastError for Documents.
+  let lastError = null, dbName = DB, dbPromise = null;
+  const errText = (e) => (e && (e.message || e.name)) || String(e);
+  function openDb(name, version) {
     return new Promise((res, rej) => {
-      const r = indexedDB.open(DB, 1);
-      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-      r.onsuccess = () => res(r.result);
+      const r = version ? indexedDB.open(name, version) : indexedDB.open(name);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE); };
+      r.onsuccess = () => {
+        const db = r.result;
+        if (db.objectStoreNames.contains(STORE)) return res(db);
+        // Opened, but without the folders table: add it.
+        const v = db.version + 1; db.close();
+        openDb(name, v).then(res, rej);
+      };
       r.onerror = () => rej(r.error);
+      r.onblocked = () => rej(new Error('the folder store is in use by another dashboard tab; close the other tabs and reload'));
     });
+  }
+  const dropDb = (name) => new Promise((res) => { const r = indexedDB.deleteDatabase(name); r.onsuccess = r.onerror = r.onblocked = () => res(); });
+  function idb() {
+    if (!dbPromise) {
+      dbPromise = (async () => {
+        try { return await openDb(dbName); } catch (e) {
+          lastError = `Couldn't open the browser's store of linked folders (${errText(e)}).`;
+          console.warn(lastError);
+          try { await dropDb(dbName); return await openDb(dbName); } catch (_) {}
+          dbName = DB + 'Folders';
+          return openDb(dbName);
+        }
+      })();
+      dbPromise.catch(() => { dbPromise = null; });
+    }
+    return dbPromise;
   }
   async function tx(mode, fn) {
     const db = await idb();
     return new Promise((res, rej) => {
-      const t = db.transaction(STORE, mode);
+      let t;
+      try { t = db.transaction(STORE, mode); } catch (e) { dbPromise = null; return rej(e); }
       const req = fn(t.objectStore(STORE));
       t.oncomplete = () => res(req && req.result);
       t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error || new Error('the browser stopped saving'));
     });
   }
 
@@ -129,7 +158,7 @@
   const LIST = 'folders';
   async function savedAll() {
     let items = null;
-    try { items = await tx('readonly', (st) => st.get(LIST)); } catch (_) { return []; }
+    try { items = await tx('readonly', (st) => st.get(LIST)); } catch (e) { lastError = `Couldn't read the linked folders (${errText(e)}).`; console.warn(lastError); return null; }
     if (!items || !items.length) {
       const old = await saved();
       items = old ? [{ id: 'f1', handle: old }] : (items || []);
@@ -144,17 +173,19 @@
 
   /** Adds a folder (or replaces `replaceId`). Returns { id, existed }. */
   async function add(handle, replaceId) {
+    // If the saved list can't be read, don't overwrite it with just this folder.
     const items = await savedAll();
+    if (items == null) throw new Error(lastError || 'couldn\'t read the linked folders');
     for (const it of items) {
       try { if (it.id !== replaceId && await it.handle.isSameEntry(handle)) return { id: it.id, existed: true }; } catch (_) {}
     }
     const id = replaceId || 'f' + Date.now().toString(36);
-    const next = replaceId ? items.map((it) => (it.id === replaceId ? { id, handle } : it)) : [...items, { id, handle }];
+    const next = replaceId && items.some((it) => it.id === replaceId) ? items.map((it) => (it.id === replaceId ? { id, handle } : it)) : [...items, { id, handle }];
     await storeAll(next);
     return { id, existed: false };
   }
-  async function remove(id) { await storeAll((await savedAll()).filter((it) => it.id !== id)); }
+  async function remove(id) { const items = await savedAll(); if (items == null) throw new Error(lastError); await storeAll(items.filter((it) => it.id !== id)); }
 
   global.CrownFolder = { periodEnd, shortcutTarget, sharePointSite, supported, pick, remember, saved, forget, permission, list,
-    savedAll, choose, add, remove };
+    savedAll, choose, add, remove, get lastError() { return lastError; } };
 })(window);

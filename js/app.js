@@ -680,7 +680,7 @@
   async function initFolder() {
     if (!F || !F.supported) return;
     $('btnFolder').hidden = false;
-    const items = await F.savedAll();
+    const items = (await F.savedAll()) || [];
     // Older versions kept one folder's progress in state.folder.
     if (state.folder && items[0]) { state.folders = state.folders || {}; if (!state.folders[items[0].id]) state.folders[items[0].id] = state.folder; }
     delete state.folder;
@@ -698,11 +698,20 @@
     if (!F || !F.supported) { toast('Linking a folder needs Microsoft Edge or Google Chrome.'); return; }
     let handle;
     try { handle = await F.choose(); } catch (e) { if (e.name !== 'AbortError') toast('Couldn\'t link that folder: ' + e.message); return; }
-    const { id, existed } = await F.add(handle, replaceId);
+    // The same folder linked again after the browser lost it: carry on from what was already read.
+    const again = !replaceId && Object.entries(state.folders || {}).find(([fid, st]) => st.name === handle.name && !folders.some((f) => f.id === fid));
+    if (again) replaceId = again[0];
+    let id, existed = false;
+    try { ({ id, existed } = await F.add(handle, replaceId)); } catch (e) {
+      // The browser wouldn't remember it: still use it now, and say so.
+      id = replaceId || 'f' + Date.now().toString(36);
+      toast(`📁 ${handle.name} is linked for now, but the browser couldn't remember it (${e.message || e}), so it will need linking again after a reload. See Documents.`);
+    }
     if (existed) { toast(`📁 ${handle.name} is already linked.`); return; }
     folders = folders.filter((f) => f.id !== id).concat({ id, handle, perm: 'granted' });
     state.folders = state.folders || {};
-    state.folders[id] = { name: handle.name, seen: {}, files: {}, readerVersion: READER_VERSION };
+    if (again && state.folders[id]) state.folders[id].name = handle.name;
+    else state.folders[id] = { name: handle.name, seen: {}, files: {}, readerVersion: READER_VERSION };
     save(); renderFolder();
     await scanAll(true, id);
   }
@@ -717,7 +726,7 @@
   }
 
   async function unlinkFolder(id) {
-    await F.remove(id);
+    try { await F.remove(id); } catch (e) { toast(`📁 Unlinked for now, but the browser couldn't update its list (${e.message || e}).`); }
     folders = folders.filter((f) => f.id !== id);
     if (state.folders) delete state.folders[id];
     save(); renderFolder(); renderSources();
@@ -910,7 +919,13 @@
         </details>` : ''}
       </div>`;
     });
-    panel.innerHTML = `${boxes.join('')}
+    // Folders this browser had linked before but can't find now (their names are kept with the documents).
+    const lost = Object.entries(state.folders || {}).filter(([id, st]) => st.name && !folders.some((f) => f.id === id)).map(([, st]) => st.name);
+    const problem = F && F.lastError;
+    panel.innerHTML = `${problem || lost.length ? `<div class="rev-alert">${problem ? `<strong>⚠ ${esc(problem)}</strong>` : ''}
+        ${lost.length ? `<p>Previously linked here: <b>${lost.map(esc).join('</b>, <b>')}</b>. Link ${lost.length === 1 ? 'it' : 'them'} again with <b>📁 Link ${folders.length ? 'another ' : ''}folder</b>; files already read won't be read twice unless they've changed.</p>` : ''}
+        ${problem ? '<p class="muted small">If linking keeps failing, close every other tab with the dashboard open and reload this one. Edge or Chrome may also need site data allowed for this site (Settings › Cookies and site permissions).</p>' : ''}</div>` : ''}
+      ${boxes.join('')}
       <div class="folder-box ${folders.length ? 'add-box' : ''}">
         ${folders.length ? '' : `<strong>No folder linked</strong>
         <p class="muted small">Link the folders where TL Sheets and BEOs are saved, e.g. the SharePoint TL folder synced to File Explorer, and a folder you save BEOs into. New or updated files load automatically.</p>`}
@@ -982,7 +997,7 @@
     $('folderPanel').onclick = (e) => {
       const a = e.target.closest('[data-folder]'); if (!a) return;
       const id = a.dataset.id;
-      ({ link: () => linkFolder(), change: () => linkFolder(id), scan: () => scanAll(true), reread: () => rereadFolder(id),
+      ({ link: () => linkFolder().catch((e) => toast(`📁 Couldn't link that folder: ${e.message || e}`)), change: () => linkFolder(id).catch((e) => toast(`📁 Couldn't change that folder: ${e.message || e}`)), scan: () => scanAll(true), reread: () => rereadFolder(id),
         reconnect: reconnectFolders, unlink: () => unlinkFolder(id) })[a.dataset.folder]();
     };
     // Linked folders are checked when the dashboard opens (initFolder) and then on the hour, every hour,
