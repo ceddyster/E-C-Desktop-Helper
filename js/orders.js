@@ -7,7 +7,7 @@
  *   Beer (full strength)  guests × per person (Sports 5 · Corporate 3 · Wedding 3)
  *   Light beer            guests × per person (Sports 3 · Corporate 2 · Wedding 2)
  *   Red wine / White wine tables × 2.5 · Sparkling tables × 5
- * Cocktail: guests × glasses per person × assumption % ÷ glasses per bottle, for each of
+ * Cocktail: guests × glasses per person × assumption % ÷ glasses per bottle × hours, for each of
  *   Sparkling · Red wine 1 & 2 · White wine 1 & 2 · Beer 1 & 2 · Light beer 1.
  * Two of a kind (e.g. two reds): the one picked as primary is "1", the other "2". On a seated event the
  * category's total is shared in the same proportions (reds 15 : 10, whites 20 : 15, beers 30 : 25).
@@ -86,7 +86,8 @@
 
   /** Bottles for one event. products: [{ name, cat }] in BEO order; primary: { red: name, … }.
    *  → { tables, lines: [{ name, cat, bottles, how }] } */
-  function compute({ type, guests, products, primary, params }) {
+  function compute({ type, guests, products, primary, params, hours }) {
+    const hrs = hours > 0 ? hours : 1;
     const P = params || DEFAULTS;
     const pax = Math.max(0, +guests || 0);
     if (type === 'tasting') {
@@ -121,8 +122,8 @@
         } else ordered.forEach((p) => lines.push({ name: p.name, cat, bottles: up(total / ordered.length),
           how: ordered.length > 1 ? `${basis} = ${fmtN(total)} bottles in total, shared by ${ordered.length}` : basis }));
       } else {
-        const q = (s) => pax * s.gpp * s.pct / 100 / s.gpb;
-        const desc = (s, n) => `${pax} guests × ${s.gpp} × ${s.pct}% ÷ ${s.gpb}${n > 1 ? ` = ${fmtN(q(s))} bottles in total, shared by ${n}` : ''}`;
+        const q = (s) => pax * s.gpp * s.pct / 100 / s.gpb * hrs;
+        const desc = (s, n) => `${pax} guests × ${s.gpp} × ${s.pct}% ÷ ${s.gpb} × ${fmtN(hrs)} hour${hrs === 1 ? '' : 's'}${n > 1 ? ` = ${fmtN(q(s))} bottles in total, shared by ${n}` : ''}`;
         if (!slots.length) continue;
         if (ordered.length === 1 || slots.length === 1) ordered.forEach((p) => lines.push({ name: p.name, cat, bottles: up(q(slots[0]) / ordered.length), how: desc(slots[0], ordered.length) }));
         else {

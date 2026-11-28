@@ -59,11 +59,14 @@
         for (const a of ch.added || []) if (!products.some((p) => p.name.toLowerCase() === a.name.toLowerCase())) products.push({ name: a.name, cat: a.cat, added: true, fromMenu: true });
         const type = ch.type || O().guessType(e);
         const guests = ch.guests != null && ch.guests !== '' ? +ch.guests : +e.pax || 0;
-        const r = O().compute({ type, guests, products, primary: ch.primary || {}, params: getParams() });
+        // Cocktail figures are per hour: hours from the BEO, or as entered.
+        const hoursSet = ch.hours != null && ch.hours !== '';
+        const hours = hoursSet ? +ch.hours : bev.hours || 0;
+        const r = O().compute({ type, guests, products, primary: ch.primary || {}, params: getParams(), hours });
         // Amounts typed in by hand replace the worked-out ones.
         const qty = ch.qty || {};
         for (const l of r.lines) if (qty[l.name] != null) { l.auto = l.bottles; l.bottles = qty[l.name]; l.manual = true; }
-        out.push({ e, key, hidden: !!ch.hidden, softOnly: products.every((p) => p.cat === 'none'), clientSupplied: bev.clientSupplied, type, guessed: !ch.type, guests, guestsEdited: ch.guests != null && ch.guests !== '', products, tables: r.tables, lines: r.lines, packages: bev.packages, primary: ch.primary || {} });
+        out.push({ e, key, hours, hoursSet, hoursFrom: bev.hoursFrom, hidden: !!ch.hidden, softOnly: products.every((p) => p.cat === 'none'), clientSupplied: bev.clientSupplied, type, guessed: !ch.type, guests, guestsEdited: ch.guests != null && ch.guests !== '', products, tables: r.tables, lines: r.lines, packages: bev.packages, primary: ch.primary || {} });
       }
     }
     return out;
@@ -112,9 +115,11 @@
         <div class="ord-ev-opts">${typeSel(x)}${x.guessed ? '' : ' <span class="muted small">(set by you)</span>'}
           <label class="small">Guests <input type="number" min="0" value="${x.guests}" data-ord-guests="${esc(x.key)}" class="ord-guests"></label>
           ${x.type !== 'cocktail' && x.type !== 'tasting' ? `<span class="small muted">${x.tables} table${x.tables === 1 ? '' : 's'}</span>` : ''}
+          ${x.type === 'cocktail' ? `<label class="small" title="${x.hoursSet ? 'Set by you' : x.hoursFrom ? `From ${esc(x.hoursFrom)}` : 'Not on the BEO'}">Hours <input type="number" min="0" step="0.5" value="${x.hours || ''}" placeholder="?" data-ord-hours="${k}" class="ord-guests"></label>` : ''}
           <button type="button" class="btn ghost sm" data-ord-hide="${k}" title="Leave this event out of the order">Hide</button></div>
       </div>
       ${x.softOnly ? '<p class="muted small">Soft drinks only: nothing is ordered unless you enter an amount or add an item.</p>' : ''}
+      ${x.type === 'cocktail' && !x.hours && !x.softOnly ? '<p class="win-warn">⚠ The BEO doesn\'t say how long the drinks run: enter the hours (worked out as 1 hour until then).</p>' : ''}
       ${!x.guests && x.type !== 'tasting' && !x.softOnly ? '<p class="win-warn">⚠ No guest number on the BEO: enter it to work out the order.</p>' : ''}
       ${x.clientSupplied && x.type !== 'tasting' ? '<p class="win-warn">⚠ The client supplies some of the drinks (corkage / sponsored), so only the items on consumption or in a package are ordered here, but the figures still assume they\'re for every guest. Check the bottles, and change the guests or set an item to "Not ordered" if needed.</p>' : ''}
       ${picks ? `<div class="ord-picks">${picks}</div>` : ''}
@@ -199,8 +204,8 @@
     ws1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }];
     X.utils.book_append_sheet(wb, ws1, 'Order');
     // Sheet 2: each event.
-    const ev = [['Date', 'Event', 'BEO #', 'Event type', 'Guests', 'Tables', 'Product', 'Category', 'Bottles', 'How it was worked out']];
-    for (const x of list) if (!x.hidden) for (const l of x.lines) if (l.bottles) ev.push([fmtDMY(x.e.date), x.e.title, x.e.beo.number || '', typeName[x.type], x.guests, x.type === 'cocktail' || x.type === 'tasting' ? '' : x.tables, l.name, O().CAT_NAME[l.cat], l.bottles, l.manual ? `entered by hand (worked out: ${l.auto || 0})` : l.how]);
+    const ev = [['Date', 'Event', 'BEO #', 'Event type', 'Guests', 'Tables / hours', 'Product', 'Category', 'Bottles', 'How it was worked out']];
+    for (const x of list) if (!x.hidden) for (const l of x.lines) if (l.bottles) ev.push([fmtDMY(x.e.date), x.e.title, x.e.beo.number || '', typeName[x.type], x.guests, x.type === 'tasting' ? '' : x.type === 'cocktail' ? `${x.hours || 1} h` : x.tables, l.name, O().CAT_NAME[l.cat], l.bottles, l.manual ? `entered by hand (worked out: ${l.auto || 0})` : l.how]);
     const ws2 = X.utils.aoa_to_sheet(ev);
     ws2['!cols'] = [{ wch: 11 }, { wch: 34 }, { wch: 8 }, { wch: 22 }, { wch: 7 }, { wch: 7 }, { wch: 40 }, { wch: 22 }, { wch: 8 }, { wch: 46 }];
     X.utils.book_append_sheet(wb, ws2, 'By event');
@@ -234,6 +239,7 @@
       if (t.dataset.ordType) ch(t.dataset.ordType).type = t.value;
       else if (t.dataset.ordPrimary) { const c = ch(t.dataset.ordPrimary); c.primary = Object.assign({}, c.primary, { [t.dataset.cat]: t.value }); }
       else if (t.dataset.ordGuests) ch(t.dataset.ordGuests).guests = t.value === '' ? null : +t.value;
+      else if (t.dataset.ordHours) ch(t.dataset.ordHours).hours = t.value === '' ? null : +t.value;
       else if (t.dataset.ordCat) catEdits[t.dataset.ordCat.toLowerCase()] = t.value;
       else if (t.dataset.ordQty) { const c = ch(t.dataset.ordQty); c.qty = Object.assign({}, c.qty); if (t.value === '') delete c.qty[t.dataset.name]; else c.qty[t.dataset.name] = Math.max(0, Math.round(+t.value || 0)); }
       else if (t.dataset.ordAddname) { const cat = t.closest('.ord-add').querySelector('[data-ord-addcat]'); const m = menuItems().find((i) => i.name.toLowerCase() === t.value.trim().toLowerCase()); cat.value = m || t.value.trim() ? O().categorise(t.value.trim(), menuItems()).cat.replace('none', cat.value) : cat.value; return; }

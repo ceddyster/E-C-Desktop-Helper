@@ -42,20 +42,34 @@
    *  items and the products in any beverage package, as written on the BEO. Corkage / client-supplied
    *  drinks aren't included, nor are notes, prices or guest counts. → { items: [names], packages: [package lines] } */
   function orderItems(lines) {
-    const out = { items: [], packages: [], clientSupplied: false, soft: false };
+    const out = { items: [], packages: [], clientSupplied: false, soft: false, hours: 0, hoursFrom: '' };
+    // How long the drinks run: "… - 3 Hours", "(Min) - 4.5 Hours", "- 5 hours 45 minutes" on the heading,
+    // else the time range of that part of the event ("18:00 - 21:00" = 3 hours). The longest counts.
+    let range = null;
+    const noteHours = (t) => {
+      const h = t.match(/(\d+(?:\.\d+)?)\s*(?:hours?|hrs?)\b/i), m = t.match(/(\d+)\s*(?:minutes?|mins?)\b/i);
+      let v = (h ? +h[1] : 0) + (m ? +m[1] / 60 : 0), from = v ? `"${t}"` : '';
+      if (!v && range) { v = range.len; from = `${range.text} on the BEO`; }
+      if (v > out.hours) { out.hours = Math.round(v * 100) / 100; out.hoursFrom = from; }
+    };
     const add = (name) => { name = name.replace(/\s+/g, ' ').trim(); if (name && !out.items.some((x) => x.toLowerCase() === name.toLowerCase())) out.items.push(name); };
     let mode = '';          // 'on' | 'pkg' | 'soft' | ''
     for (const raw of lines || []) {
       const t = String(raw).replace(/\s+/g, ' ').trim();
       if (!t) continue;
-      if (RANGE.test(t)) { mode = ''; continue; }
+      const r = t.match(RANGE);
+      if (r) {
+        let len = (+r[3] * 60 + +r[4]) - (+r[1] * 60 + +r[2]); if (len <= 0) len += 1440;
+        range = { len: len / 60, text: `${hm(r[1], r[2])} - ${hm(r[3], r[4])}` };
+        mode = ''; continue;
+      }
       if (/corkage|client supplied|supplied by (the )?client|beverage supplied by|sponsor/i.test(t)) { if (!/^>/.test(t)) out.clientSupplied = true; mode = ''; continue; }
       // "Beverages on consumption", "VIP Tables Spirits on Consumption", "Heineken Zero - Consumption"…
       // (headings, not "> notes"). Soft drinks (on consumption or a package) are listed, but not ordered.
-      if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? 'soft' : 'on'; if (mode === 'soft') out.soft = true; continue; }
+      if (!/^>/.test(t) && (/\bon consumption\b/i.test(t) || /-\s*consumption\b/i.test(t)) && !/^included/i.test(t)) { mode = /soft drinks?/i.test(t) ? 'soft' : 'on'; if (mode === 'soft') out.soft = true; else noteHours(t); continue; }
       if (/package/i.test(t) && !/^>/.test(t) && !/included in/i.test(t)) {
         if (/soft drinks?/i.test(t)) { mode = 'soft'; out.soft = true; continue; }
-        mode = 'pkg'; out.packages.push(t); continue;
+        mode = 'pkg'; out.packages.push(t); noteHours(t); continue;
       }
       if (!mode) continue;
       if (/^\d*\s*@|^\d+\s*(\(.*?\)\s*)?guests?\b|beverage notes|^~+$/i.test(t)) { mode = ''; continue; }
